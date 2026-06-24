@@ -1,0 +1,97 @@
+Task 3 — Customer account dashboard
+Add customer authentication and account dashboard.
+Auth system:
+
+Registration + login via email + password (bcrypt, JWT stored in httpOnly cookie)
+Separate from admin auth — customer JWT has role: "customer"
+Login page: /prihlaseni
+Registration page: /registrace
+After login: redirect to /ucet
+
+Database additions:
+prismamodel Customer {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  firstName    String?
+  lastName     String?
+  phone        String?
+  address      String?
+  city         String?
+  zip          String?
+  createdAt    DateTime  @default(now())
+  orders       Order[]
+  buybacks     BuybackRequest[]
+}
+Add customerId String? and customer Customer? @relation(...) to Order and BuybackRequest models.
+Pages:
+/prihlaseni — login form (email + heslo) + link na registraci. Same dark luxury design.
+/registrace — registration form (email, heslo, jméno, příjmení, telefon). On success → redirect to /ucet.
+/ucet — customer dashboard with sidebar navigation:
+Sidebar tabs:
+
+Přehled
+Moje objednávky
+Výkupy
+Nastavení účtu
+
+Tab: Přehled
+
+Welcome: "Vítejte, {firstName}"
+Stats cards: počet objednávek, celková hodnota nakoupených kovů v Kč, počet výkupů
+Last 3 orders preview (order number, date, status badge, total)
+Current gold spot price (from /api/prices)
+
+Tab: Moje objednávky
+
+Table: číslo objednávky / datum / produkty / celkem Kč / stav (badge)
+Click row → order detail modal:
+
+Order number, date, status
+Items table (produkt, váha, množství, cena/ks, celkem)
+Delivery + payment method
+Bank transfer details if status = "new" (account number, VS, amount)
+"Sledovat zásilku" button if status = "shipped" (placeholder link)
+
+
+
+Tab: Výkupy
+
+Table: číslo žádosti / datum / popis / odhadovaná cena / stav
+Click row → detail modal with all fields + admin note if filled
+
+Tab: Nastavení účtu
+
+Form: jméno, příjmení, telefon, adresa, město, PSČ
+Change password section: current password + new password + confirm
+Save button for each section separately
+Danger zone: "Smazat účet" (requires password confirmation)
+
+API routes:
+POST /api/auth/register     — create customer, return JWT cookie
+POST /api/auth/login        — verify, return JWT cookie
+POST /api/auth/logout       — clear cookie
+GET  /api/auth/me           — return current customer data
+PUT  /api/auth/me           — update profile
+PUT  /api/auth/password     — change password
+GET  /api/customer/orders   — customer's orders (auth required)
+GET  /api/customer/buybacks — customer's buybacks (auth required)
+Header update:
+
+"Přihlásit" link → if logged in show customer first name + avatar initials circle, click → /ucet
+If not logged in → /prihlaseni
+
+Checkout integration:
+
+If customer is logged in during checkout → auto-fill name/email/phone/address from profile
+Link order to customer account (set customerId on Order)
+
+Admin panel update:
+
+Add "Zákazníci" tab in admin sidebar
+Table: jméno, email, telefon, počet objednávek, celková hodnota, datum registrace
+Click row → customer detail: profile info + list of their orders + list of their buybacks
+
+Design:
+
+Same dark luxury theme. Customer dashboard sidebar same style as admin sidebar. Stats cards same style as admin dashboard cards. All badges same avail-badge style.

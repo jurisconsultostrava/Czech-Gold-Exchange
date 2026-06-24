@@ -8,6 +8,7 @@ export const buybacksTable = pgTable("buyback_requests", {
     .$defaultFn(() => crypto.randomUUID()),
   requestNumber: text("request_number").notNull().unique(),
   status: text("status").notNull().default("new"),
+  customerId: text("customer_id"),
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email").notNull(),
   customerPhone: text("customer_phone"),

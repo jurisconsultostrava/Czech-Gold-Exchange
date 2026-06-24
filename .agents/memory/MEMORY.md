@@ -1,1 +1,2 @@
 - [SwissGold reference design](swissgold-reference-design.md) — decode the MHTML capture's quoted-printable CSS with Node (no python3); exact gold/ink/bg tokens + ticker marquee + card anatomy.
+- [SwissGold dual auth model](swissgold-auth.md) — admin = bearer JWT (localStorage); customer = httpOnly cookie `sg_customer_token` (auto-sent same-origin, no mutator change); JWT secret is fail-fast, never hardcode a fallback.

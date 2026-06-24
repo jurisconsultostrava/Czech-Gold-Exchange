@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout";
 import { CartProvider } from "@/lib/cart-context";
 import { CurrencyProvider } from "@/lib/currency-context";
+import { CustomerAuthProvider } from "@/lib/customer-auth";
 import { initAdminAuth, isAdminAuthenticated } from "@/lib/admin-auth";
 import NotFound from "@/pages/not-found";
 
@@ -14,6 +15,9 @@ import Detail from "@/pages/detail";
 import Kosik from "@/pages/kosik";
 import Vykup from "@/pages/vykup";
 import ONas from "@/pages/o-nas";
+import Prihlaseni from "@/pages/prihlaseni";
+import Registrace from "@/pages/registrace";
+import Ucet from "@/pages/ucet";
 import AdminLogin from "@/pages/admin/login";
 import AdminDashboard from "@/pages/admin/dashboard";
 
@@ -38,6 +42,9 @@ function PublicRouter() {
         <Route path="/kosik" component={Kosik} />
         <Route path="/vykup" component={Vykup} />
         <Route path="/o-nas" component={ONas} />
+        <Route path="/prihlaseni" component={Prihlaseni} />
+        <Route path="/registrace" component={Registrace} />
+        <Route path="/ucet" component={Ucet} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
@@ -65,11 +72,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <CurrencyProvider>
-          <CartProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <Router />
-            </WouterRouter>
-          </CartProvider>
+          <CustomerAuthProvider>
+            <CartProvider>
+              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                <Router />
+              </WouterRouter>
+            </CartProvider>
+          </CustomerAuthProvider>
         </CurrencyProvider>
         <Toaster />
       </TooltipProvider>

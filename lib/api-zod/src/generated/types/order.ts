@@ -11,6 +11,8 @@ export interface Order {
   id: string;
   orderNumber: string;
   status: string;
+  /** @nullable */
+  customerId?: string | null;
   customerName: string;
   customerEmail: string;
   /** @nullable */

@@ -140,6 +140,8 @@ export interface Order {
   id: string;
   orderNumber: string;
   status: string;
+  /** @nullable */
+  customerId?: string | null;
   customerName: string;
   customerEmail: string;
   /** @nullable */
@@ -180,6 +182,8 @@ export interface Buyback {
   id: string;
   requestNumber: string;
   status: string;
+  /** @nullable */
+  customerId?: string | null;
   customerName: string;
   customerEmail: string;
   /** @nullable */
@@ -266,6 +270,87 @@ export interface AdminStats {
   newBuybacks: number;
   spotGoldCzkPerGram: number;
   eurCzk: number;
+}
+
+export interface Customer {
+  id: string;
+  email: string;
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  address?: string | null;
+  /** @nullable */
+  city?: string | null;
+  /** @nullable */
+  zip?: string | null;
+  createdAt: string;
+}
+
+export interface CustomerRegister {
+  email: string;
+  /** @minLength 6 */
+  password: string;
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+  /** @nullable */
+  phone?: string | null;
+}
+
+export interface CustomerLogin {
+  email: string;
+  password: string;
+}
+
+export interface CustomerProfileUpdate {
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  address?: string | null;
+  /** @nullable */
+  city?: string | null;
+  /** @nullable */
+  zip?: string | null;
+}
+
+export interface PasswordChange {
+  currentPassword: string;
+  /** @minLength 6 */
+  newPassword: string;
+}
+
+export interface MessageResponse {
+  message: string;
+}
+
+export interface AdminCustomerSummary {
+  id: string;
+  email: string;
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  createdAt: string;
+  orderCount: number;
+  totalSpentCzk: number;
+  buybackCount: number;
+}
+
+export interface AdminCustomerDetail {
+  customer: Customer;
+  orders: Order[];
+  buybacks: Buyback[];
 }
 
 export interface ErrorResponse {

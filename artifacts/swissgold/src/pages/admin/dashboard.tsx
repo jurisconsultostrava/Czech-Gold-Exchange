@@ -6,6 +6,7 @@ import AdminOverview from "./tabs/overview";
 import AdminProducts from "./tabs/products";
 import AdminOrders from "./tabs/orders";
 import AdminBuybacks from "./tabs/buybacks";
+import AdminCustomers from "./tabs/customers";
 import AdminContent from "./tabs/content";
 import AdminPricing from "./tabs/pricing";
 import AdminImportExport from "./tabs/import-export";
@@ -15,6 +16,7 @@ type TabKey =
   | "products"
   | "orders"
   | "buybacks"
+  | "customers"
   | "content"
   | "pricing"
   | "io";
@@ -24,6 +26,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "products", label: "Produkty" },
   { key: "orders", label: "Objednávky" },
   { key: "buybacks", label: "Výkupy" },
+  { key: "customers", label: "Zákazníci" },
   { key: "content", label: "Obsah webu" },
   { key: "pricing", label: "Cenotvorba" },
   { key: "io", label: "Import / Export" },
@@ -78,6 +81,7 @@ export default function AdminDashboard() {
         {tab === "products" && <AdminProducts />}
         {tab === "orders" && <AdminOrders />}
         {tab === "buybacks" && <AdminBuybacks />}
+        {tab === "customers" && <AdminCustomers />}
         {tab === "content" && <AdminContent />}
         {tab === "pricing" && <AdminPricing />}
         {tab === "io" && <AdminImportExport />}
