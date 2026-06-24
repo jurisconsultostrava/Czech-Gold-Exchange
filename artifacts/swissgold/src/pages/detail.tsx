@@ -1,16 +1,27 @@
 import { useState } from "react";
 import { useRoute } from "wouter";
-import { useGetProduct, useGetPrices } from "@workspace/api-client-react";
+import {
+  useGetProduct,
+  getGetProductQueryKey,
+  useGetPrices,
+  getGetPricesQueryKey,
+} from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/lib/cart-context";
+import { useCurrency } from "@/lib/currency-context";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Detail() {
   const [, params] = useRoute("/detail/:id");
+  const { format } = useCurrency();
   const productId = params?.id || "";
   
-  const { data: product } = useGetProduct(productId, { query: { enabled: !!productId }});
-  const { data: prices } = useGetPrices({ query: { refetchInterval: 60000 } });
+  const { data: product } = useGetProduct(productId, {
+    query: { enabled: !!productId, queryKey: getGetProductQueryKey(productId) },
+  });
+  const { data: prices } = useGetPrices({
+    query: { refetchInterval: 60000, queryKey: getGetPricesQueryKey() },
+  });
   
   const { addToCart } = useCart();
   const { toast } = useToast();
@@ -46,8 +57,8 @@ export default function Detail() {
           <div className="py-6 border-y border-bg-3 mb-8">
              {price ? (
                <div>
-                 <div className="text-4xl text-gold font-light mb-2">{price.sellPriceCzk.toLocaleString("cs-CZ")} Kč</div>
-                 <div className="text-ink-2">Výkupní cena: {price.purchaseDisplayCzk.toLocaleString("cs-CZ")} Kč</div>
+                 <div className="text-4xl text-gold font-light mb-2">{format(price.sellPriceCzk)}</div>
+                 <div className="text-ink-2">Výkupní cena: {format(price.purchaseDisplayCzk)}</div>
                </div>
              ) : (
                <div className="text-xl text-ink-2">Cena na dotaz</div>

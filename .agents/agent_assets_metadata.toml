@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "ErUhiGWybGwDjJyVA3vYD"
+uri = "file://attached_assets/generated_images/cinematic_dark_luxury_background_99bc.png"
+type = "image"
+title = "generated_image"

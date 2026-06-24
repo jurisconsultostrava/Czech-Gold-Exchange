@@ -1,37 +1,49 @@
-import { useListFeaturedProducts, useGetPrices, useGetContent } from "@workspace/api-client-react";
+import { useListFeaturedProducts, useGetPrices, getGetPricesQueryKey, useGetContent } from "@workspace/api-client-react";
 import { ProductCard } from "@/components/product-card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
+import heroBg from "@/assets/hero-bg.png";
 
 export default function Home() {
   const { data: featured } = useListFeaturedProducts();
-  const { data: prices } = useGetPrices({ query: { refetchInterval: 60000 } });
+  const { data: prices } = useGetPrices({
+    query: { refetchInterval: 60000, queryKey: getGetPricesQueryKey() },
+  });
   const { data: content } = useGetContent();
 
   return (
     <div className="w-full">
       {/* Hero Section */}
-      <section className="relative min-h-[70vh] flex items-center justify-center border-b border-bg-3">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-bg-2 to-bg-0 z-0" />
-        <div className="container mx-auto px-4 z-10 text-center">
-          <h1 className="mb-6 font-display text-ink-1">
-            Investiční zlato <br />
-            <span className="text-gold">a vzácné kovy</span>
-          </h1>
-          <p className="text-lg text-ink-2 max-w-2xl mx-auto mb-10">
-            {content?.["home_hero_subtitle"] || "Diskrétní a bezpečný nákup slitků a mincí s garancí zpětného výkupu."}
-          </p>
-          <div className="flex gap-4 justify-center">
-            <Link href="/katalog">
-              <Button className="bg-gold text-bg-0 hover:bg-gold-2 px-8 h-12 text-base rounded-none">
-                Vstoupit do katalogu
-              </Button>
-            </Link>
-            <Link href="/vykup">
-              <Button variant="outline" className="border-gold text-gold hover:bg-gold/10 px-8 h-12 text-base rounded-none">
-                Zadat výkup
-              </Button>
-            </Link>
+      <section className="relative min-h-[60vh] flex items-center border-b border-bg-3 overflow-hidden">
+        <img
+          src={heroBg}
+          alt=""
+          aria-hidden
+          className="absolute inset-0 w-full h-full object-cover object-right z-0"
+        />
+        <div className="absolute inset-0 z-[1] bg-gradient-to-r from-bg-0 via-bg-0/90 to-bg-0/30" />
+        <div className="container mx-auto px-4 z-10">
+          <div className="max-w-2xl">
+            <p className="eyebrow mb-4">Specialisté na investování do zlata</p>
+            <h1 className="mb-6 font-display text-ink-1">
+              Investiční zlato <br />
+              <span className="text-gold">a vzácné kovy</span>
+            </h1>
+            <p className="text-lg text-ink-2 max-w-xl mb-10">
+              {content?.["home_hero_subtitle"] || "Diskrétní a bezpečný nákup slitků a mincí s garancí zpětného výkupu."}
+            </p>
+            <div className="flex flex-wrap gap-4">
+              <Link href="/katalog">
+                <Button className="bg-gold text-bg-0 hover:bg-gold-2 px-8 h-12 text-base">
+                  Naše nabídka
+                </Button>
+              </Link>
+              <Link href="/vykup">
+                <Button variant="outline" className="border-gold text-gold hover:bg-gold/10 px-8 h-12 text-base">
+                  Výkup zlata
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -48,13 +60,13 @@ export default function Home() {
               Celá nabídka &rarr;
             </Link>
           </div>
-          
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {featured?.map((product) => (
-              <ProductCard 
-                key={product.id} 
-                product={product} 
-                price={prices?.find(p => p.id === product.id)} 
+              <ProductCard
+                key={product.id}
+                product={product}
+                price={prices?.find((p) => p.id === product.id)}
               />
             ))}
           </div>

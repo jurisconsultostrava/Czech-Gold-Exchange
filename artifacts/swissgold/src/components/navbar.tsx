@@ -1,10 +1,12 @@
 import { Link } from "wouter";
 import { useCart } from "@/lib/cart-context";
-import { ShoppingCart, Menu } from "lucide-react";
+import { useCurrency } from "@/lib/currency-context";
+import { ShoppingCart, Menu, User } from "lucide-react";
 import { Button } from "./ui/button";
 
 export function Navbar() {
   const { itemCount } = useCart();
+  const { currency, toggle } = useCurrency();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-bg-1/80 backdrop-blur-md">
@@ -19,8 +21,22 @@ export function Navbar() {
             <Link href="/o-nas" className="text-ink-2 hover:text-ink-1 transition-colors">O nás</Link>
           </nav>
         </div>
-        
-        <div className="flex items-center gap-4">
+
+        <div className="flex items-center gap-2 sm:gap-4">
+          <button
+            onClick={toggle}
+            aria-label="Přepnout měnu"
+            className="text-xs font-mono border border-bg-3 hover:border-gold rounded-sm px-2 py-1 text-ink-2 hover:text-gold transition-colors"
+          >
+            {currency}
+          </button>
+          <Link
+            href="/admin/login"
+            className="hidden sm:flex items-center gap-1.5 text-sm text-ink-2 hover:text-gold transition-colors"
+          >
+            <User className="w-4 h-4" />
+            <span>Přihlásit</span>
+          </Link>
           <Link href="/kosik" className="relative text-ink-1 hover:text-gold transition-colors">
             <ShoppingCart className="w-5 h-5" />
             {itemCount > 0 && (

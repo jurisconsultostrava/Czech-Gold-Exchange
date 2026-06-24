@@ -14,17 +14,17 @@ export function Footer() {
           <div>
             <h4 className="text-sm font-bold uppercase tracking-wider mb-4 text-ink-1">Produkty</h4>
             <ul className="space-y-2 text-sm text-ink-2">
-              <li><Link href="/katalog?category=Zlato">Investiční zlato</Link></li>
-              <li><Link href="/katalog?category=Stříbro">Investiční stříbro</Link></li>
-              <li><Link href="/katalog?category=Platina">Platina a Palladium</Link></li>
+              <li><Link href="/katalog?category=Zlato" className="hover:text-gold transition-colors">Investiční zlato</Link></li>
+              <li><Link href="/katalog?category=Stříbro" className="hover:text-gold transition-colors">Investiční stříbro</Link></li>
+              <li><Link href="/katalog?category=Platina" className="hover:text-gold transition-colors">Platina a Palladium</Link></li>
             </ul>
           </div>
           <div>
             <h4 className="text-sm font-bold uppercase tracking-wider mb-4 text-ink-1">Společnost</h4>
             <ul className="space-y-2 text-sm text-ink-2">
-              <li><Link href="/o-nas">O nás</Link></li>
-              <li><Link href="/vykup">Výkup kovů</Link></li>
-              <li><Link href="/kontakt">Kontakt</Link></li>
+              <li><Link href="/o-nas" className="hover:text-gold transition-colors">O nás</Link></li>
+              <li><Link href="/vykup" className="hover:text-gold transition-colors">Výkup kovů</Link></li>
+              <li><Link href="/o-nas" className="hover:text-gold transition-colors">Kontakt</Link></li>
             </ul>
           </div>
           <div>
@@ -39,8 +39,8 @@ export function Footer() {
         <div className="pt-8 border-t border-white/5 text-xs text-ink-3 flex flex-col md:flex-row justify-between items-center gap-4">
           <p>© {new Date().getFullYear()} SwissGold.cz. Všechna práva vyhrazena.</p>
           <div className="flex gap-4">
-            <Link href="/obchodni-podminky">Obchodní podmínky</Link>
-            <Link href="/ochrana-soukromi">Ochrana soukromí</Link>
+            <span>Obchodní podmínky</span>
+            <span>Ochrana soukromí</span>
           </div>
         </div>
       </div>
