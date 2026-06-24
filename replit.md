@@ -30,6 +30,7 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Architecture decisions
 
+- Two separate xaumanager.cz feeds, joined by item ID: the **product feed** (`PRODUCT_FEED_URL`, `…/export/meistergold`) is the catalog source for the seed (authoritative material/weight/fineness/category/image); the **price feed** (`PRICE_FEED_URL`, `…/export/xml`) supplies live price/stock/buyback at request time.
 - Live metal spot prices are proxied server-side; the client reads them via `useGetSpot`/`useGetPrices`.
 - Prices are stored in haléře (÷100). EUR display uses `eurCzk` from settings via a client-side `CurrencyProvider` (CZK/EUR toggle in the navbar) — no separate EUR price field.
 - Admin auth is JWT (bearer token in `localStorage` key `sg_admin_token`); import/export endpoints use plain `fetch`, everything else uses generated hooks.

@@ -4,6 +4,9 @@ import { logger } from "./logger";
 export const PRICE_FEED_URL =
   process.env.PRICE_FEED_URL ??
   "https://xaumanager.cz/api/export/xml?hash=moje-zlato-secret";
+export const PRODUCT_FEED_URL =
+  process.env.PRODUCT_FEED_URL ??
+  "https://xaumanager.cz/api/export/meistergold?hash=moje-zlato-secret";
 export const SPOT_API_URL =
   process.env.SPOT_API_URL ?? "https://xaumanager.cz/api/public/spot";
 
@@ -14,6 +17,17 @@ export interface FeedItem {
   purchasePriceHaler: number;
   amount: number;
   availability: string;
+}
+
+export interface ProductFeedItem {
+  id: string;
+  name: string;
+  image: string | null;
+  categoryText: string;
+  material: string;
+  weightGrams: number;
+  fineness: string;
+  deliveryDate: number;
 }
 
 export interface SpotEntryRaw {
@@ -81,6 +95,60 @@ export async function fetchPriceFeed(
   feedCache = { data: map, ts: Date.now() };
   logger.info({ count: map.size }, "Price feed refreshed");
   return map;
+}
+
+interface RawParam {
+  PARAM_NAME?: unknown;
+  VAL?: unknown;
+}
+
+function getParam(params: RawParam[], name: string): string {
+  const hit = params.find(
+    (p) => String(p.PARAM_NAME ?? "").trim().toLowerCase() === name.toLowerCase(),
+  );
+  return hit ? String(hit.VAL ?? "").trim() : "";
+}
+
+export async function fetchProductFeed(): Promise<ProductFeedItem[]> {
+  const res = await fetch(PRODUCT_FEED_URL);
+  if (!res.ok) {
+    throw new Error(`Product feed responded ${res.status}`);
+  }
+  const xml = await res.text();
+  const parsed = parser.parse(xml) as {
+    SHOP?: { SHOPITEM?: unknown };
+  };
+
+  const items = asArray(parsed.SHOP?.SHOPITEM) as Array<Record<string, unknown>>;
+  const products: ProductFeedItem[] = [];
+
+  for (const raw of items) {
+    const id = String(raw["ITEM_ID"] ?? "").trim();
+    if (!id) continue;
+    const params = asArray(raw["PARAM"]) as RawParam[];
+    const weightStr = getParam(params, "Hmotnost").replace(/[^\d.,]/g, "");
+    const weightGrams = Math.round(Number(weightStr.replace(",", ".")) * 1000) / 1000;
+    if (!Number.isFinite(weightGrams) || weightGrams <= 0) {
+      logger.warn(
+        { id, hmotnost: getParam(params, "Hmotnost") },
+        "Product feed item has missing or invalid weight",
+      );
+    }
+    const image = asArray(raw["IMGURL"])[0];
+    products.push({
+      id,
+      name: String(raw["PRODUCTNAME"] ?? "").trim(),
+      image: image ? String(image).trim() : null,
+      categoryText: String(raw["CATEGORYTEXT"] ?? "").trim(),
+      material: getParam(params, "Material"),
+      weightGrams: Number.isFinite(weightGrams) ? weightGrams : 0,
+      fineness: getParam(params, "Ryzost") || "999.9",
+      deliveryDate: toNumber(raw["DELIVERY_DATE"]),
+    });
+  }
+
+  logger.info({ count: products.length }, "Product feed fetched");
+  return products;
 }
 
 export async function fetchSpot(force = false): Promise<SpotRaw> {

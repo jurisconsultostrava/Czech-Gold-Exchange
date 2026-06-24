@@ -5,7 +5,7 @@ import {
   settingsTable,
 } from "@workspace/db";
 import type { InsertProduct } from "@workspace/db";
-import { fetchPriceFeed } from "../lib/feeds";
+import { fetchProductFeed } from "../lib/feeds";
 
 type Metal = "gold" | "silver" | "platinum" | "palladium";
 type Kind = "mince" | "slitek";
@@ -68,12 +68,25 @@ const MANUFACTURERS: { canonical: string; terms: string[] }[] = [
   { canonical: "Heraeus", terms: ["Heraeus"] },
 ];
 
-function detectMetal(name: string): Metal {
+function materialToMetal(material: string, name: string): Metal {
+  const m = material.toLowerCase();
+  if (m.startsWith("stř") || m.startsWith("str")) return "silver";
+  if (m.startsWith("plat")) return "platinum";
+  if (m.startsWith("pall")) return "palladium";
+  if (m.startsWith("zlat")) return "gold";
   const n = name.toLowerCase();
   if (n.includes("silver")) return "silver";
   if (n.includes("platinum")) return "platinum";
   if (n.includes("palladium")) return "palladium";
   return "gold";
+}
+
+function categoryFromFeed(categoryText: string): string | null {
+  const t = categoryText.toLowerCase();
+  if (t.includes("stribro") || t.includes("stříbro")) return "investicni-stribro";
+  if (t.includes("platina") || t.includes("palladium")) return "platina-palladium";
+  if (t.includes("zlato")) return "investicni-zlato";
+  return null;
 }
 
 function detectSeries(name: string): string | null {
@@ -186,18 +199,6 @@ function detectYear(name: string): number | null {
   return null;
 }
 
-function fineness(metal: Metal): string {
-  switch (metal) {
-    case "gold":
-      return "999.9";
-    case "silver":
-      return "999";
-    case "platinum":
-    case "palladium":
-      return "999.5";
-  }
-}
-
 function buildCzechName(opts: {
   metal: Metal;
   kind: Kind;
@@ -228,9 +229,8 @@ function buildCzechName(opts: {
 }
 
 async function seed(): Promise<void> {
-  const feed = await fetchPriceFeed(true);
-  const entries = [...feed.values()];
-  console.log(`Fetched ${entries.length} feed items`);
+  const entries = await fetchProductFeed();
+  console.log(`Fetched ${entries.length} product feed items`);
 
   const featuredCount = Math.min(6, entries.length);
   const featuredIdx = new Set<number>();
@@ -239,13 +239,15 @@ async function seed(): Promise<void> {
   }
 
   const products: InsertProduct[] = entries.map((item, i) => {
-    const metal = detectMetal(item.name);
+    const metal = materialToMetal(item.material, item.name);
     const series = detectSeries(item.name);
     const kind = detectKind(item.name, series);
-    const { grams, label } = detectWeight(item.name);
+    const { label } = detectWeight(item.name);
     const manufacturer = detectManufacturer(item.name);
     const year = detectYear(item.name);
-    const { category, subcat } = detectCategory(item.name, metal, kind);
+    const detected = detectCategory(item.name, metal, kind);
+    const category = categoryFromFeed(item.categoryText) ?? detected.category;
+    const subcat = detected.subcat;
     const name = buildCzechName({
       metal,
       kind,
@@ -255,17 +257,17 @@ async function seed(): Promise<void> {
       weightLabel: label,
     });
     return {
-      id: item.code,
+      id: item.id,
       name,
       manufacturer,
-      weightGrams: grams,
-      fineness: fineness(metal),
+      weightGrams: item.weightGrams,
+      fineness: item.fineness,
       category,
       subcat,
       year,
       featured: featuredIdx.has(i),
       active: true,
-      image: `https://goldspot.cz/obrazky/${item.code}/1.webp`,
+      image: item.image ?? `https://goldspot.cz/obrazky/${item.id}/1.webp`,
       description: `${name}. Originál: ${item.name}.`,
       sortOrder: i,
     };
