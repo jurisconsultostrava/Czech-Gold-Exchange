@@ -3,13 +3,21 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: SwissGold.cz precious metals e-commerce API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: catalog
+    description: Public catalog and pricing
+  - name: shop
+    description: Orders and buyback
+  - name: content
+    description: Editable website content
+  - name: admin
+    description: Admin operations (JWT protected)
 paths:
   /healthz:
     get:
@@ -24,7 +32,520 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /products:
+    get:
+      operationId: listProducts
+      tags: [catalog]
+      summary: List active products
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema: { type: string }
+        - name: subcat
+          in: query
+          required: false
+          schema: { type: string }
+        - name: search
+          in: query
+          required: false
+          schema: { type: string }
+        - name: featured
+          in: query
+          required: false
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /products/featured:
+    get:
+      operationId: listFeaturedProducts
+      tags: [catalog]
+      summary: Six random active products for the homepage
+      responses:
+        "200":
+          description: Featured products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /products/{id}:
+    get:
+      operationId: getProduct
+      tags: [catalog]
+      summary: Get a single product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /prices:
+    get:
+      operationId: getPrices
+      tags: [catalog]
+      summary: Live merged prices from the XML feed plus margin
+      responses:
+        "200":
+          description: Price entries keyed by product id
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProductPrice"
+
+  /spot:
+    get:
+      operationId: getSpot
+      tags: [catalog]
+      summary: Live spot prices for the ticker
+      responses:
+        "200":
+          description: Spot data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpotData"
+
+  /settings/public:
+    get:
+      operationId: getPublicSettings
+      tags: [catalog]
+      summary: Public pricing settings needed for price display
+      responses:
+        "200":
+          description: Public settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicSettings"
+
+  /content:
+    get:
+      operationId: getContent
+      tags: [content]
+      summary: All content blocks as a key/value map
+      responses:
+        "200":
+          description: Content map
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentMap"
+
+  /orders:
+    post:
+      operationId: createOrder
+      tags: [shop]
+      summary: Create an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderInput"
+      responses:
+        "201":
+          description: Created order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /buyback:
+    post:
+      operationId: createBuyback
+      tags: [shop]
+      summary: Create a buyback request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuybackInput"
+      responses:
+        "201":
+          description: Created buyback request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Buyback"
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/login:
+    post:
+      operationId: adminLogin
+      tags: [admin]
+      summary: Admin login, returns a JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminCredentials"
+      responses:
+        "200":
+          description: Token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthToken"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: Dashboard stats
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
+  /admin/products:
+    get:
+      operationId: adminListProducts
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: List all products (incl. inactive)
+      responses:
+        "200":
+          description: Products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /admin/products/{id}:
+    put:
+      operationId: adminUpdateProduct
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: Update a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductUpdate"
+      responses:
+        "200":
+          description: Updated product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+
+  /admin/orders:
+    get:
+      operationId: adminListOrders
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: List orders
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+
+  /admin/orders/{id}:
+    get:
+      operationId: adminGetOrder
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: Get order with items
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: adminUpdateOrder
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: Update order status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderStatusUpdate"
+      responses:
+        "200":
+          description: Updated order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /admin/buybacks:
+    get:
+      operationId: adminListBuybacks
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: List buyback requests
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Buybacks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Buyback"
+
+  /admin/buybacks/{id}:
+    get:
+      operationId: adminGetBuyback
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: Get buyback request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Buyback
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Buyback"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: adminUpdateBuyback
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: Update buyback status and note
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuybackStatusUpdate"
+      responses:
+        "200":
+          description: Updated buyback
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Buyback"
+
+  /admin/settings:
+    get:
+      operationId: adminGetSettings
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: Get settings
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    put:
+      operationId: adminUpdateSettings
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: Update settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsUpdate"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+
+  /admin/content:
+    get:
+      operationId: adminListContent
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: List all content blocks
+      responses:
+        "200":
+          description: Content blocks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContentBlock"
+
+  /admin/content/{key}:
+    put:
+      operationId: adminUpdateContent
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: Update a content block
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContentBlockUpdate"
+      responses:
+        "200":
+          description: Updated content block
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentBlock"
+
+  /admin/overrides:
+    get:
+      operationId: adminListOverrides
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: List price overrides
+      responses:
+        "200":
+          description: Overrides
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PriceOverride"
+
+  /admin/overrides/{id}:
+    put:
+      operationId: adminUpdateOverride
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: Create or update a price override
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PriceOverrideUpdate"
+      responses:
+        "200":
+          description: Updated override
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceOverride"
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +555,399 @@ components:
       required:
         - status
 
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - weightGrams
+        - fineness
+        - category
+        - subcat
+        - featured
+        - active
+        - sortOrder
+      properties:
+        id: { type: string }
+        name: { type: string }
+        manufacturer: { type: ["string", "null"] }
+        weightGrams: { type: number }
+        fineness: { type: string }
+        category: { type: string }
+        subcat: { type: string }
+        year: { type: ["integer", "null"] }
+        featured: { type: boolean }
+        active: { type: boolean }
+        image: { type: ["string", "null"] }
+        description: { type: ["string", "null"] }
+        sortOrder: { type: integer }
+
+    ProductUpdate:
+      type: object
+      required:
+        - name
+        - category
+        - subcat
+        - weightGrams
+        - fineness
+        - featured
+        - active
+        - sortOrder
+      properties:
+        name: { type: string, minLength: 1 }
+        manufacturer: { type: ["string", "null"] }
+        weightGrams: { type: number }
+        fineness: { type: string }
+        category: { type: string }
+        subcat: { type: string }
+        year: { type: ["integer", "null"] }
+        featured: { type: boolean }
+        active: { type: boolean }
+        image: { type: ["string", "null"] }
+        description: { type: ["string", "null"] }
+        sortOrder: { type: integer }
+
+    ProductPrice:
+      type: object
+      required:
+        - id
+        - basePriceCzk
+        - purchasePriceCzk
+        - sellPriceCzk
+        - sellPriceEur
+        - purchaseDisplayCzk
+        - inStock
+        - availability
+      properties:
+        id: { type: string }
+        basePriceCzk: { type: number }
+        purchasePriceCzk: { type: number }
+        sellPriceCzk: { type: number }
+        sellPriceEur: { type: number }
+        purchaseDisplayCzk: { type: number }
+        inStock: { type: boolean }
+        availability: { type: string }
+
+    SpotEntry:
+      type: object
+      required:
+        - metal
+        - pricePerGramCzk
+        - pricePerOzCzk
+      properties:
+        metal: { type: string }
+        pricePerGramCzk: { type: number }
+        pricePerOzCzk: { type: number }
+
+    SpotData:
+      type: object
+      required:
+        - spots
+        - eurCzk
+        - ts
+      properties:
+        spots:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpotEntry"
+        eurCzk: { type: number }
+        ts: { type: string }
+
+    PublicSettings:
+      type: object
+      required:
+        - eurToCzk
+        - deferredDiscountPct
+        - bulkTier1Qty
+        - bulkTier1DiscountPct
+        - bulkTier2Qty
+        - bulkTier2DiscountPct
+        - bulkTier3Qty
+        - bulkTier3DiscountPct
+      properties:
+        eurToCzk: { type: number }
+        deferredDiscountPct: { type: number }
+        bulkTier1Qty: { type: integer }
+        bulkTier1DiscountPct: { type: number }
+        bulkTier2Qty: { type: integer }
+        bulkTier2DiscountPct: { type: number }
+        bulkTier3Qty: { type: integer }
+        bulkTier3DiscountPct: { type: number }
+
+    ContentMap:
+      type: object
+      additionalProperties:
+        type: string
+
+    ContentBlock:
+      type: object
+      required:
+        - key
+        - value
+      properties:
+        key: { type: string }
+        value: { type: string }
+
+    ContentBlockUpdate:
+      type: object
+      required:
+        - value
+      properties:
+        value: { type: string }
+
+    OrderItemInput:
+      type: object
+      required:
+        - productId
+        - productName
+        - quantity
+        - unitPriceCzk
+        - unitPriceEur
+      properties:
+        productId: { type: string }
+        productName: { type: string }
+        weightGrams: { type: ["number", "null"] }
+        quantity: { type: integer }
+        unitPriceCzk: { type: number }
+        unitPriceEur: { type: number }
+
+    OrderInput:
+      type: object
+      required:
+        - customerName
+        - customerEmail
+        - paymentMethod
+        - deliveryMethod
+        - currency
+        - totalCzk
+        - totalEur
+        - items
+      properties:
+        customerName: { type: string, minLength: 1 }
+        customerEmail: { type: string, minLength: 1 }
+        customerPhone: { type: ["string", "null"] }
+        customerAddress: { type: ["string", "null"] }
+        customerCity: { type: ["string", "null"] }
+        customerZip: { type: ["string", "null"] }
+        paymentMethod: { type: string }
+        deliveryMethod: { type: string }
+        currency: { type: string }
+        totalCzk: { type: number }
+        totalEur: { type: number }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItemInput"
+
+    OrderItem:
+      type: object
+      required:
+        - id
+        - productId
+        - productName
+        - quantity
+        - unitPriceCzk
+        - unitPriceEur
+      properties:
+        id: { type: string }
+        productId: { type: string }
+        productName: { type: string }
+        weightGrams: { type: ["number", "null"] }
+        quantity: { type: integer }
+        unitPriceCzk: { type: number }
+        unitPriceEur: { type: number }
+
+    Order:
+      type: object
+      required:
+        - id
+        - orderNumber
+        - status
+        - customerName
+        - customerEmail
+        - paymentMethod
+        - deliveryMethod
+        - totalCzk
+        - totalEur
+        - currency
+        - createdAt
+        - items
+      properties:
+        id: { type: string }
+        orderNumber: { type: string }
+        status: { type: string }
+        customerName: { type: string }
+        customerEmail: { type: string }
+        customerPhone: { type: ["string", "null"] }
+        customerAddress: { type: ["string", "null"] }
+        customerCity: { type: ["string", "null"] }
+        customerZip: { type: ["string", "null"] }
+        paymentMethod: { type: string }
+        deliveryMethod: { type: string }
+        totalCzk: { type: number }
+        totalEur: { type: number }
+        currency: { type: string }
+        createdAt: { type: string, format: date-time }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+
+    OrderStatusUpdate:
+      type: object
+      required:
+        - status
+      properties:
+        status: { type: string }
+
+    BuybackInput:
+      type: object
+      required:
+        - customerName
+        - customerEmail
+      properties:
+        customerName: { type: string, minLength: 1 }
+        customerEmail: { type: string, minLength: 1 }
+        customerPhone: { type: ["string", "null"] }
+        itemDescription: { type: ["string", "null"] }
+        estimatedCzk: { type: ["number", "null"] }
+
+    Buyback:
+      type: object
+      required:
+        - id
+        - requestNumber
+        - status
+        - customerName
+        - customerEmail
+        - createdAt
+      properties:
+        id: { type: string }
+        requestNumber: { type: string }
+        status: { type: string }
+        customerName: { type: string }
+        customerEmail: { type: string }
+        customerPhone: { type: ["string", "null"] }
+        itemDescription: { type: ["string", "null"] }
+        estimatedCzk: { type: ["number", "null"] }
+        adminNote: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+
+    BuybackStatusUpdate:
+      type: object
+      required:
+        - status
+      properties:
+        status: { type: string }
+        adminNote: { type: ["string", "null"] }
+
+    Settings:
+      type: object
+      required:
+        - id
+        - eurToCzk
+        - globalMarginCzk
+        - marginInvestZlato
+        - marginInvestStribro
+        - marginPlatinaPalladium
+        - marginMinceCnb
+        - buybackSpreadPct
+        - deferredDiscountPct
+        - bulkTier1Qty
+        - bulkTier1DiscountPct
+        - bulkTier2Qty
+        - bulkTier2DiscountPct
+        - bulkTier3Qty
+        - bulkTier3DiscountPct
+      properties:
+        id: { type: integer }
+        eurToCzk: { type: number }
+        globalMarginCzk: { type: number }
+        marginInvestZlato: { type: number }
+        marginInvestStribro: { type: number }
+        marginPlatinaPalladium: { type: number }
+        marginMinceCnb: { type: number }
+        buybackSpreadPct: { type: number }
+        deferredDiscountPct: { type: number }
+        bulkTier1Qty: { type: integer }
+        bulkTier1DiscountPct: { type: number }
+        bulkTier2Qty: { type: integer }
+        bulkTier2DiscountPct: { type: number }
+        bulkTier3Qty: { type: integer }
+        bulkTier3DiscountPct: { type: number }
+
+    SettingsUpdate:
+      type: object
+      properties:
+        eurToCzk: { type: number }
+        globalMarginCzk: { type: number }
+        marginInvestZlato: { type: number }
+        marginInvestStribro: { type: number }
+        marginPlatinaPalladium: { type: number }
+        marginMinceCnb: { type: number }
+        buybackSpreadPct: { type: number }
+        deferredDiscountPct: { type: number }
+        bulkTier1Qty: { type: integer }
+        bulkTier1DiscountPct: { type: number }
+        bulkTier2Qty: { type: integer }
+        bulkTier2DiscountPct: { type: number }
+        bulkTier3Qty: { type: integer }
+        bulkTier3DiscountPct: { type: number }
+
+    PriceOverride:
+      type: object
+      required:
+        - productId
+        - active
+      properties:
+        productId: { type: string }
+        marginCzk: { type: ["number", "null"] }
+        marginPct: { type: ["number", "null"] }
+        active: { type: boolean }
+
+    PriceOverrideUpdate:
+      type: object
+      required:
+        - active
+      properties:
+        marginCzk: { type: ["number", "null"] }
+        marginPct: { type: ["number", "null"] }
+        active: { type: boolean }
+
+    AdminCredentials:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email: { type: string }
+        password: { type: string }
+
+    AuthToken:
+      type: object
+      required:
+        - token
+      properties:
+        token: { type: string }
+
+    AdminStats:
+      type: object
+      required:
+        - productCount
+        - newOrders
+        - newBuybacks
+        - spotGoldCzkPerGram
+        - eurCzk
+      properties:
+        productCount: { type: integer }
+        newOrders: { type: integer }
+        newBuybacks: { type: integer }
+        spotGoldCzkPerGram: { type: number }
+        eurCzk: { type: number }
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error: { type: string }

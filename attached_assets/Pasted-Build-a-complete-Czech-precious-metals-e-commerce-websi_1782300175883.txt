@@ -1,0 +1,422 @@
+Build a complete Czech precious metals e-commerce website called SwissGold.cz deployed on Railway.
+Design
+See in DESIGN SYSTEM
+Live Price Feed
+Primary price source: https://xaumanager.cz/api/export/xml?hash=moje-zlato-secret
+XML structure:
+<SHOPITEM>
+  <CODE>30070</CODE>
+  <NAME>1 Kilo Gold Bar | Argor-Heraeus</NAME>
+  <PRICE_VAT>2852701</PRICE_VAT>
+  <PURCHASE_PRICE>2838508</PURCHASE_PRICE>
+  <STOCK><AMOUNT>1</AMOUNT></STOCK>
+  <AVAILABILITY_IN_STOCK>Skladem</AVAILABILITY_IN_STOCK>
+</SHOPITEM>
+
+PRICE_VAT and PURCHASE_PRICE are in haléře (divide by 100 to get Kč). Fetch via server-side API route /api/prices every 60 seconds to avoid CORS. Cache in memory.
+Spot prices: https://xaumanager.cz/api/public/spot Response: {spots: [{metal, price_per_gram_czk, price_per_oz_czk}], eur_czk, ts} Use for live ticker.
+Database Schema (Prisma)
+model Product {
+  id           String   @id
+  name         String
+  manufacturer String?
+  weightGrams  Float
+  fineness     String   @default("999.9")
+  category     String
+  subcat       String
+  year         Int?
+  featured     Boolean  @default(false)
+  active       Boolean  @default(true)
+  image        String?
+  description  String?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+  status          String      @default("new")
+  customerName    String
+  customerEmail   String
+  customerPhone   String?
+  customerAddress String?
+  customerCity    String?
+  customerZip     String?
+  paymentMethod   String      @default("bank_transfer")
+  deliveryMethod  String      @default("personal")
+  totalCzk        Float
+  totalEur        Float
+  currency        String      @default("CZK")
+  createdAt       DateTime    @default(now())
+  items           OrderItem[]
+}
+
+model OrderItem {
+  id           String  @id @default(cuid())
+  orderId      String
+  order        Order   @relation(fields: [orderId], references: [id])
+  productId    String
+  productName  String
+  weightGrams  Float?
+  quantity     Int     @default(1)
+  unitPriceCzk Float
+  unitPriceEur Float
+}
+
+model BuybackRequest {
+  id              String   @id @default(cuid())
+  requestNumber   String   @unique
+  status          String   @default("new")
+  customerName    String
+  customerEmail   String
+  customerPhone   String?
+  itemDescription String?
+  estimatedCzk    Float?
+  adminNote       String?
+  createdAt       DateTime @default(now())
+}
+
+model Settings {
+  id                    Int   @id @default(1)
+  eurToCzk              Float @default(25.20)
+  globalMarginCzk       Float @default(300)
+  marginInvestZlato     Float @default(300)
+  marginInvestStribro   Float @default(200)
+  marginPlatinaPalladium Float @default(400)
+  marginMinceCnb        Float @default(500)
+  buybackSpreadPct      Float @default(0)
+  deferredDiscountPct   Float @default(9)
+  bulkTier1Qty          Int   @default(2)
+  bulkTier1DiscountPct  Float @default(0.05)
+  bulkTier2Qty          Int   @default(5)
+  bulkTier2DiscountPct  Float @default(0.1)
+  bulkTier3Qty          Int   @default(10)
+  bulkTier3DiscountPct  Float @default(0.2)
+}
+
+model PriceOverride {
+  productId  String  @id
+  marginCzk  Float?
+  marginPct  Float?
+  active     Boolean @default(true)
+}
+
+model ContentBlock {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+Pages
+1. Homepage /
+·	Live ticker (marquee above header) — gold/silver/platinum/palladium in CZK/g and CZK/oz
+·	Hero — full-screen mountain background, headline from ContentBlock hero_headline, subtitle from hero_subtitle, two buttons: "Naše nabídka" + "Výkup zlata"
+·	Featured products grid — 6 random active products, product cards
+·	Trust section — 3 pillars from ContentBlocks
+·	Story section — from ContentBlocks, facts grid
+2. Catalog /katalog
+·	Sidebar filters: category (radio: Vše / Investiční zlato / Investiční stříbro / Platina & palladium), subcat (radio, dynamic per category), weight (checkbox), manufacturer (checkbox), availability (checkbox), price range slider
+·	Product grid — 5 columns desktop, 2 mobile
+·	Sort: Doporučené / Cena vzestupně / Cena sestupně / Hmotnost
+·	URL params: ?grp=investicni-zlato&sub=slitky
+·	Prices loaded from /api/prices, merged with product data from DB
+3. Product Detail /detail/[id]
+Layout exactly like goldenhouse.cz:
+Left side — image gallery:
+·	Main image (large)
+·	3 thumbnails below: https://goldspot.cz/obrazky/{id}/1.webp, /2.webp, /3.webp
+·	Click thumbnail → swap main image with fade transition
+Right side — info panel:
+·	Breadcrumb: E-shop › Kategorie › Název produktu
+·	Category eyebrow label
+·	Product name (h1)
+·	Availability badge (Skladem ČR / Skladem DE/CH / Na cestě / Předobjednávka)
+·	Main price box (dark background, gold border):
+o	Label: "Prodejní cena (osvobozeno od DPH)"
+o	Big price in CZK from /api/prices PRICE_VAT + margin
+o	Secondary price in EUR
+o	"Výkupní cena: X Kč (osvobozeno od DPH)"
+o	Qty selector (−/input/+) + "KOUPIT" button
+·	Terminované dodání box (golden background, ):
+o	Header: "Zvýhodněná cena s terminovaným dodáním" + clock icon
+o	Price = main price × (1 - deferredDiscountPct/100)
+o	"Osvobozeno od DPH"
+o	"Odložené dodání za 12 měsíců"
+o	Qty selector + "KOUPIT" button
+·	Množstevní sleva box (golden background):
+o	"Množstevní sleva:"
+o	Od {tier1Qty} ks: price × (1 - tier1DiscountPct/100) Kč / ks
+o	Od {tier2Qty} ks: price × (1 - tier2DiscountPct/100) Kč / ks
+o	Od {tier3Qty} ks: price × (1 - tier3DiscountPct/100) Kč / ks
+·	Spec table: Výrobce / Materiál / Váha / Ryzost / Rok / DPH: 0%
+·	"Potřebujete poradit?" box: phone +420 xxxxx, email info@swiss-gold.cz
+·	Description text from DB
+·	LBMA / Mincovna info block
+·	Buyback guarantee card
+4. Cart /kosik
+·	Cart items with qty controls and remove button
+·	Order summary: subtotal CZK + EUR
+·	Checkout form: jméno, email, telefon, způsob doručení (osobní převzetí Praha / zásilkovna / PPL), způsob platby (bankovní převod / dobírka do 30 000 Kč / rozložená platba 12×)
+·	On bank transfer: show QR code via https://api.paylibo.com/paylibo/generator/czech/image?accountNumber=&bankCode=&amount={amount}&currency=CZK&vs={vs}
+·	On submit: POST /api/orders → save to DB → show thank you page with order number SG-YYMMDD-XXXX
+5. Buyback /vykup
+·	Live calculator: product selector + qty → show PURCHASE_PRICE from XML
+·	Request form: jméno, email, telefon, poznámka
+·	POST /api/buyback → save to DB → confirmation
+6. About /o-nas
+·	All text from ContentBlocks
+·	Sections: cenotvorba, LBMA certifikace, kontakt
+·	Contact: SWISS GOLDxxxxxxxxx
+7. Admin /admin
+Password protected via JWT. Login page at /admin/login.
+Dashboard — stats cards: počet produktů, nové objednávky, nové výkupy, aktuální spot zlata, aktuální EUR/CZK
+Produkty — table with all products, search, filter by category/active. Edit modal per product: name, manufacturer, category, subcat, weight, fineness, year, featured toggle, active toggle, description textarea. No price editing (prices from XML).
+Objednávky — table with status filter (new/paid/shipped/delivered/cancelled). Click row → order detail with items. Status update dropdown.
+Výkupy — table with status filter. Click row → detail. Status update + admin note field.
+Obsah webu — edit all website texts without touching code:
+·	ContentBlock keys: hero_headline, hero_subtitle, pillar_1_title, pillar_1_text, pillar_2_title, pillar_2_text, pillar_3_title, pillar_3_text, story_headline, story_text_1, story_text_2, fact_1_number, fact_1_label, fact_2_number, fact_2_label, fact_3_number, fact_3_label, fact_4_number, fact_4_label, about_pricing_title, about_pricing_text, about_lbma_title, about_lbma_text, buyback_headline, buyback_subtitle, footer_legal, footer_copyright
+·	Simple form: each key has a label + text input or textarea
+·	Save button per block or "Uložit vše"
+·	Changes reflect immediately on frontend (no restart needed)
+Cenotvorba — edit margin settings:
+·	Globální přirážka (Kč)
+·	Přirážka per kategorie (4 inputs)
+·	Výkupní spread (%)
+·	Sleva terminované dodání (%)
+·	Množstevní slevy — 3 tiers (qty threshold + discount %)
+·	Per-product override table: search product by name/code, set fixed marginCzk or marginPct
+Import / Export:
+Export:
+·	"Stáhnout XML" button → /api/admin/export/xml → Shoptet-compatible XML with current prices + margin
+·	"Stáhnout CSV" button → /api/admin/export/csv → columns: code, czech_name, price_czk, purchase_price_czk, category, manufacturer, weight_grams, availability
+Import:
+·	Upload XML (Shoptet format) → parse → preview first 10 rows → confirm → update DB (match by CODE: update name/category/subcat/manufacturer/weight/description, insert new, skip unknown)
+·	Upload CSV → same flow
+·	After import: show report "X přidáno, Y aktualizováno, Z přeskočeno"
+API routes:
+GET  /api/prices              — proxy xaumanager XML → JSON [{id, priceCzk, purchasePriceCzk, inStock}]
+GET  /api/content             — all ContentBlocks as {key: value} object
+POST /api/orders              — create order
+POST /api/buyback             — create buyback request
+POST /api/admin/login         — return JWT
+GET  /api/admin/products      — list (auth)
+PUT  /api/admin/products/[id] — update (auth)
+GET  /api/admin/orders        — list (auth)
+PUT  /api/admin/orders/[id]   — update status (auth)
+GET  /api/admin/buybacks      — list (auth)
+PUT  /api/admin/buybacks/[id] — update status + note (auth)
+GET  /api/admin/settings      — get settings (auth)
+PUT  /api/admin/settings      — update settings (auth)
+GET  /api/admin/content       — list all blocks (auth)
+PUT  /api/admin/content/[key] — update block (auth)
+GET  /api/admin/export/xml    — export XML (auth)
+GET  /api/admin/export/csv    — export CSV (auth)
+POST /api/admin/import/xml    — import XML (auth)
+POST /api/admin/import/csv    — import CSV (auth)
+GET  /api/admin/overrides     — list price overrides (auth)
+PUT  /api/admin/overrides/[id] — update override (auth)
+
+Product Naming Convention (Czech)
+Bar:  {Manufacturer} zlatý/stříbrný/platinový/palladiový slitek {weight} [{series}]
+Coin: {Mint} zlatá/stříbrná/platinová/palladiová mince {series} {year} {weight}
+
+Examples:
+"Argor-Heraeus zlatý slitek 1 kg"
+"Valcambi zlatý slitek 1 kg ražený"
+"PAMP Suisse zlatý slitek 100 g litý"
+"Royal Canadian Mint zlatá mince Maple Leaf 2026 1 oz"
+"Münze Österreich zlatá mince Wiener Philharmoniker 2026 1 oz"
+"South African Mint zlatá mince Krugerrand 2026 1 oz"
+"U.S. Mint zlatá mince American Eagle 2026 1 oz"
+"Perth Mint zlatá mince Kangaroo 2026 1 oz"
+
+Seed Script
+Fetch XML from https://xaumanager.cz/api/export/xml?hash=moje-zlato-secret, parse all 215 SHOPITEMs, for each:
+. Párování produktů probíhá podle CODE nebo ITEM ID
+·	Detect metal (gold/silver/platinum/palladium) from name
+·	Detect kind (bar/coin) from name keywords
+·	Detect manufacturer/mint from name
+·	Detect weight from name
+·	Detect year from name
+·	Build Czech name using naming convention above
+·	Set category and subcat
+·	Set image = https://goldspot.cz/obrazky/{CODE}/1.webp
+·	Insert into products table
+Environment Variables
+DATABASE_URL=
+ADMIN_EMAIL=
+ADMIN_PASSWORD=
+JWT_SECRET=
+PRICE_FEED_URL=https://xaumanager.cz/api/export/xml?hash=moje-zlato-secret
+SPOT_API_URL=https://xaumanager.cz/api/public/spot
+Admin panel — doplnění
+Content Manager (správa textů webu) V admin panelu přidej záložku "Obsah webu" kde lze editovat všechny texty na webu bez zásahu do kódu:
+·	Hero headline a podtitulek (homepage)
+·	SEO title a meta description pro každou stránku
+·	Texty v sekci "Tři pilíře důvěry" (nadpisy + odstavce)
+·	Story sekce (nadpis, odstavce, čísla v fact gridu)
+·	Texty na stránce O nás (cenotvorba, LBMA sekce, kontaktní údaje)
+·	Texty na stránce Výkup (nadpis, podmínky, instrukce)
+·	Footer texty (copyright, právní upozornění)
+Implementace: tabulka ContentBlock v DB s klíčem (hero_headline, hero_subtitle, pillar_1_title atd.) a hodnotou. Frontend načítá texty přes /api/content. Admin edituje přes jednoduchý formulář s textovými poli a textarea. Změny se projeví okamžitě bez restartu.
+prisma
+model ContentBlock {
+  key       String @id   // např. "hero_headline"
+  value     String
+  updatedAt DateTime @updatedAt
+}
+Správa přirážky (marže)
+V admin panelu záložka "Cenotvorba":
+·	Globální přirážka v Kč (přičtena ke každé ceně z XML feeds) — default 300 Kč
+·	Přirážka per kategorie (investicni-zlato, investicni-stribro, platina-palladium, mince-cnb) — každá kategorie má vlastní přirážku
+·	Přirážka per produkt (override pro konkrétní CODE) — tabulka PriceOverride
+·	Výkupní spread v % (kolik % pod PURCHASE_PRICE z XML se zobrazí zákazníkovi) — default 0 %
+·	Sleva pro terminované dodání v % — default 9 %
+·	Množstevní slevy — editovatelné prahy (default: 2 ks = -0.05%, 5 ks = -0.1%, 10 ks = -0.2%)
+Všechny hodnoty uložené v tabulce Settings, editovatelné v reálném čase.
+prisma
+model PriceOverride {
+  productId     String @id
+  marginCzk     Float?   // pevná přirážka v Kč pro tento produkt
+  marginPct     Float?   // nebo % přirážka
+  active        Boolean @default(true)
+}
+Import / Export (CSV a XML)
+V admin panelu záložka "Import / Export":
+Export:
+·	Export XML — vygeneruj Shoptet-kompatibilní XML feed všech aktivních produktů s aktuálními cenami z xaumanager XML + naše přirážka. URL: /api/admin/export/xml
+·	Export CSV — stejná data ve formátu CSV (code, czech_name, price_czk, purchase_price_czk, category, manufacturer, weight, availability). URL: /api/admin/export/csv
+·	Tlačítka ke stažení přímo v UI
+Import:
+·	Import XML — nahrát Shoptet XML soubor, systém porovná CODE, aktualizuje: name (czech), category, subcat, manufacturer, weight, fineness, year, description, active. Nové produkty přidá, existující aktualizuje.
+·	Import CSV — stejné jako XML ale z CSV souboru (sloupce: code, name, manufacturer, category, subcat, weight_grams, fineness, year, description, featured, active)
+·	Po importu zobrazí report: X přidáno, Y aktualizováno, Z přeskočeno (neznámý CODE)
+·	Validace před importem — zobrazit náhled prvních 10 řádků před potvrzením
+
+
+Design System 
+Global CSS variables globals.css:
+:root {
+  --bg-0: #000000;
+  --bg-1: #0a0a0a;
+  --bg-2: #111111;
+  --bg-3: #1a1a1a;
+  --line: rgba(255,255,255,0.08);
+  --gold: #C09B4B;
+  --gold-2: #d4af6a;
+  --gold-3: rgba(192,155,75,0.3);
+  --gold-bg: rgba(192,155,75,0.08);
+  --ink-1: #f5f0e8;
+  --ink-2: #b8b0a0;
+  --ink-3: #6b6560;
+  --font-display: 'Manrope', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px; --sp-9: 96px;
+}
+
+Typography:
+body { background: var(--bg-1); color: var(--ink-1); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+h1,h2,h3 { font-family: var(--font-display); font-weight: 300; letter-spacing: -0.03em; }
+h1 { font-size: clamp(2rem, 5vw, 4rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.5rem); }
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--gold); }
+.muted { color: var(--ink-3); }
+
+Ticker (above header):
+.ticker { background: var(--bg-0); border-bottom: 1px solid var(--line); height: 36px; overflow: hidden; }
+.ticker__track { display: flex; animation: ticker-scroll 40s linear infinite; white-space: nowrap; }
+.ticker__item { padding: 0 32px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
+.ticker__label { color: var(--ink-3); }
+.ticker__price { color: var(--ink-1); font-weight: 500; }
+.ticker__trend--up { color: #4ade80; }
+.ticker__trend--down { color: #f87171; }
+@keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-33.333%); } }
+
+Header:
+.site-header { background: rgba(10,10,10,0.95); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 100; height: 64px; }
+.nav { max-width: 1280px; margin: 0 auto; padding: 0 24px; height: 100%; display: flex; align-items: center; gap: 32px; }
+.logo { font-family: var(--font-display); font-size: 18px; font-weight: 600; letter-spacing: 0.1em; color: var(--ink-1); text-decoration: none; }
+.nav-links { display: flex; gap: 8px; list-style: none; margin: 0; padding: 0; flex: 1; justify-content: center; }
+.nav-links a { color: var(--ink-3); text-decoration: none; font-size: 14px; padding: 6px 12px; border-radius: var(--radius-sm); transition: color 0.15s; }
+.nav-links a:hover, .nav-links a.active { color: var(--ink-1); }
+.cart-btn { background: var(--gold); color: #000; border: none; border-radius: var(--radius-md); padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+
+Buttons:
+.btn { display: inline-flex; align-items: center; justify-content: center; padding: 12px 24px; border-radius: var(--radius-md); font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; border: none; text-decoration: none; }
+.btn--primary { background: var(--gold); color: #000; }
+.btn--primary:hover { background: var(--gold-2); }
+.btn--ghost { background: transparent; color: var(--ink-1); border: 1px solid var(--line); }
+.btn--ghost:hover { border-color: var(--gold); color: var(--gold); }
+
+Product card:
+.product { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; transition: border-color 0.15s, transform 0.15s; text-decoration: none; color: inherit; display: flex; flex-direction: column; }
+.product:hover { border-color: rgba(192,155,75,0.4); transform: translateY(-2px); }
+.product-img-wrap { aspect-ratio: 1; background: var(--bg-3); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.product-img-wrap img { width: 100%; height: 100%; object-fit: contain; }
+.product-info { padding: 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.product-cat { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
+.product-name { font-size: 14px; font-weight: 400; line-height: 1.4; margin: 0; }
+.product-meta { display: flex; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); }
+.product-price { font-size: 18px; font-weight: 300; color: var(--gold); font-family: var(--font-display); }
+.product-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }
+.avail-badge { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.avail-badge.skladem-cz { background: rgba(74,222,128,0.1); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+.avail-badge.skladem-de-ch { background: rgba(96,165,250,0.1); color: #60a5fa; border: 1px solid rgba(96,165,250,0.3); }
+.avail-badge.na-ceste { background: var(--gold-bg); color: var(--gold); border: 1px solid var(--gold-3); }
+.avail-badge.predobjednavka { background: rgba(167,139,250,0.1); color: #a78bfa; border: 1px solid rgba(167,139,250,0.3); }
+.avail-badge.nedostupne { background: rgba(255,255,255,0.05); color: var(--ink-3); border: 1px solid var(--line); }
+
+Product detail — price boxes (exact goldenhouse.cz layout):
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
+.detail-price-box { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 24px; }
+.detail-price-main { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 300; color: var(--gold); line-height: 1; }
+.detail-price-sec { font-family: var(--font-mono); font-size: 13px; color: var(--ink-3); margin-top: 4px; }
+.deferred-box { background: rgba(192,155,75,0.67); border-radius: var(--radius-lg); padding: 20px; color: #000; }
+.deferred-box .price { font-size: 1.6rem; font-weight: 600; }
+.deferred-box .discount-badge { background: rgba(0,0,0,0.2); border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700; margin-left: 8px; }
+.bulk-box { background: rgba(192,155,75,0.12); border: 1px solid var(--gold-3); border-radius: var(--radius-lg); padding: 20px; }
+.bulk-table { width: 100%; border-collapse: collapse; }
+.bulk-table li { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.1); font-weight: 500; list-style: none; }
+.bulk-table li span:first-child { font-weight: 300; width: 100px; }
+.detail-qty { display: flex; border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
+.detail-qty button { background: none; border: none; color: var(--ink-1); width: 40px; height: 44px; cursor: pointer; font-size: 18px; }
+.detail-qty button:hover { background: var(--bg-3); }
+.detail-qty input { width: 52px; height: 44px; background: none; border: none; border-left: 1px solid var(--line); border-right: 1px solid var(--line); color: var(--ink-1); text-align: center; font-family: var(--font-mono); }
+.spec-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.spec-table th { text-align: left; color: var(--ink-3); font-weight: 400; padding: 10px 0; width: 40%; border-bottom: 1px solid var(--line); }
+.spec-table td { padding: 10px 0; border-bottom: 1px solid var(--line); font-family: var(--font-mono); font-size: 12px; }
+
+Admin panel:
+.admin-shell { display: flex; min-height: 100vh; background: var(--bg-1); }
+.admin-sidebar { width: 220px; background: var(--bg-0); border-right: 1px solid var(--line); padding: 24px 0; position: fixed; top: 0; bottom: 0; display: flex; flex-direction: column; }
+.admin-nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: var(--ink-3); text-decoration: none; font-size: 14px; transition: all 0.15s; }
+.admin-nav-item:hover, .admin-nav-item.active { color: var(--ink-1); background: var(--bg-2); border-left: 2px solid var(--gold); }
+.admin-main { margin-left: 220px; flex: 1; padding: 32px; }
+.admin-card { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 24px; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.admin-table th { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--ink-3); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+.admin-table td { padding: 12px; border-bottom: 1px solid var(--line); }
+.admin-table tr:hover td { background: var(--bg-3); }
+.badge-status { padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; font-family: var(--font-mono); }
+.badge-new { background: rgba(96,165,250,0.15); color: #60a5fa; }
+.badge-paid { background: rgba(74,222,128,0.15); color: #4ade80; }
+.badge-shipped { background: var(--gold-bg); color: var(--gold); }
+.badge-delivered { background: rgba(74,222,128,0.1); color: #86efac; }
+.badge-cancelled { background: rgba(248,113,113,0.15); color: #f87171; }
+
+Footer:
+.site-footer { background: var(--bg-0); border-top: 1px solid var(--line); padding: 48px 0 24px; margin-top: 96px; }
+.footer-grid { max-width: 1280px; margin: 0 auto; padding: 0 24px; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px; }
+.footer-col h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-3); margin-bottom: 16px; font-weight: 500; }
+.footer-col a { display: block; color: var(--ink-3); text-decoration: none; font-size: 14px; margin-bottom: 8px; }
+.footer-col a:hover { color: var(--gold); }
+.footer-bottom { max-width: 1280px; margin: 48px auto 0; padding: 24px 24px 0; border-top: 1px solid var(--line); display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-3); font-family: var(--font-mono); }
+
+
