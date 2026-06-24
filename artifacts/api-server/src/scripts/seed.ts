@@ -7,52 +7,97 @@ import {
 import type { InsertProduct } from "@workspace/db";
 import { fetchPriceFeed } from "../lib/feeds";
 
-const OZ_GRAMS = 31.1035;
+type Metal = "gold" | "silver" | "platinum" | "palladium";
+type Kind = "mince" | "slitek";
 
-function detectMetal(name: string): {
-  metal: "gold" | "silver" | "platinum" | "palladium";
-  category: string;
-} {
+const METAL_ADJ: Record<Metal, { masc: string; fem: string }> = {
+  gold: { masc: "zlatý", fem: "zlatá" },
+  silver: { masc: "stříbrný", fem: "stříbrná" },
+  platinum: { masc: "platinový", fem: "platinová" },
+  palladium: { masc: "palladiový", fem: "palladiová" },
+};
+
+const COIN_SERIES = [
+  "Maple Leaf",
+  "Krugerrand",
+  "Britannia",
+  "Philharmonic",
+  "Kangaroo",
+  "Buffalo",
+  "Eagle",
+  "Panda",
+  "Libertad",
+  "Ark",
+  "Elephant",
+  "Lunar",
+  "Koala",
+  "Kookaburra",
+  "Emu",
+  "Platypus",
+  "Dragon",
+  "Tudor",
+  "Queen's Beast",
+  "St George",
+  "Angel",
+  "Bond",
+  "Star Wars",
+  "Bitcoin",
+];
+
+const MANUFACTURERS: { canonical: string; terms: string[] }[] = [
+  { canonical: "Argor-Heraeus", terms: ["Argor-Heraeus", "Argor Heraeus"] },
+  { canonical: "Valcambi", terms: ["Valcambi"] },
+  { canonical: "PAMP Suisse", terms: ["PAMP"] },
+  { canonical: "Royal Canadian Mint", terms: ["Royal Canadian Mint"] },
+  { canonical: "Royal Mint", terms: ["Royal Mint"] },
+  { canonical: "Perth Mint", terms: ["Perth Mint"] },
+  {
+    canonical: "Münze Österreich",
+    terms: ["Münze Österreich", "Vienna Philharmonic"],
+  },
+  {
+    canonical: "South African Mint",
+    terms: ["South African Mint", "Krugerrand"],
+  },
+  {
+    canonical: "U.S. Mint",
+    terms: ["U.S. Mint", "American Eagle", "American Buffalo"],
+  },
+  { canonical: "Umicore", terms: ["Umicore"] },
+  { canonical: "Metalor", terms: ["Metalor"] },
+  { canonical: "Heraeus", terms: ["Heraeus"] },
+];
+
+function detectMetal(name: string): Metal {
   const n = name.toLowerCase();
-  if (n.includes("palladium"))
-    return { metal: "palladium", category: "platina-palladium" };
-  if (n.includes("platinum"))
-    return { metal: "platinum", category: "platina-palladium" };
-  if (n.includes("silver"))
-    return { metal: "silver", category: "investicni-stribro" };
-  return { metal: "gold", category: "investicni-zlato" };
+  if (n.includes("silver")) return "silver";
+  if (n.includes("platinum")) return "platinum";
+  if (n.includes("palladium")) return "palladium";
+  return "gold";
 }
 
-function detectKind(name: string): { subcat: string; kindCz: string } {
+function detectSeries(name: string): string | null {
   const n = name.toLowerCase();
-  if (n.includes("combibar") || n.includes("combicoin"))
-    return { subcat: "slitky", kindCz: "Slitek" };
-  if (n.includes("bar")) return { subcat: "slitky", kindCz: "Slitek" };
-  if (n.includes("round")) return { subcat: "mince", kindCz: "Medaile" };
-  if (n.includes("coin")) return { subcat: "mince", kindCz: "Mince" };
-  return { subcat: "ostatni", kindCz: "Produkt" };
+  return COIN_SERIES.find((s) => n.includes(s.toLowerCase())) ?? null;
 }
 
-function detectWeightGrams(name: string): number {
-  const combi = name.match(/(\d+)\s*x\s*([\d/.]+)\s*(g|oz)/i);
-  if (combi) {
-    const count = Number(combi[1]);
-    const unitVal = parseFraction(combi[2]);
-    const grams = combi[3].toLowerCase() === "oz" ? unitVal * OZ_GRAMS : unitVal;
-    return round3(count * grams);
+function detectKind(name: string, series: string | null): Kind {
+  const n = name.toLowerCase();
+  if (n.includes("coin") || n.includes("round") || series) return "mince";
+  return "slitek";
+}
+
+function detectManufacturer(name: string): string | null {
+  const n = name.toLowerCase();
+  for (const m of MANUFACTURERS) {
+    if (m.terms.some((t) => n.includes(t.toLowerCase()))) return m.canonical;
   }
-  const kilo = name.match(/(\d+(?:[.,]\d+)?)\s*kilo/i);
-  if (kilo) return round3(Number(kilo[1].replace(",", ".")) * 1000);
-  const oz = name.match(/([\d/]+)\s*oz/i);
-  if (oz) return round3(parseFraction(oz[1]) * OZ_GRAMS);
-  const grams = name.match(/(\d+(?:[.,]\d+)?)\s*g\b/i);
-  if (grams) return round3(Number(grams[1].replace(",", ".")));
-  return 0;
+  return null;
 }
 
 function parseFraction(s: string): number {
   if (s.includes("/")) {
-    const [a, b] = s.split("/").map(Number);
+    const [a, b] = s.split("/").map((x) => Number(x));
     return b ? a / b : 0;
   }
   return Number(s.replace(",", "."));
@@ -62,34 +107,74 @@ function round3(n: number): number {
   return Math.round(n * 1000) / 1000;
 }
 
-const KNOWN_MAKERS = [
-  "Argor-Heraeus",
-  "Argor Heraeus",
-  "Valcambi",
-  "PAMP",
-  "Perth Mint",
-  "Royal Mint",
-  "Umicore",
-  "Metalor",
-  "Heraeus",
-  "Rand Refinery",
-  "Nadir Metal Rafineri",
-  "Royal Australia Mint",
-  "Royal Canadian Mint",
-];
+const OZ_WEIGHTS: Record<string, number> = {
+  "1": 31.1,
+  "1/2": 15.55,
+  "1/4": 7.78,
+  "1/10": 3.11,
+};
 
-function detectManufacturer(name: string): string | null {
-  const parts = name.split("|").map((p) => p.trim());
-  for (const part of parts.slice(1)) {
-    const maker = KNOWN_MAKERS.find((m) =>
-      part.toLowerCase().includes(m.toLowerCase()),
-    );
-    if (maker) return maker;
+function detectWeight(name: string): { grams: number; label: string } {
+  const combi = name.match(/(\d+)\s*x\s*([\d/.,]+)\s*(g|oz)/i);
+  if (combi) {
+    const count = Number(combi[1]);
+    const unit = combi[2];
+    const isOz = combi[3].toLowerCase() === "oz";
+    const unitGrams = isOz
+      ? (OZ_WEIGHTS[unit] ?? round3(parseFraction(unit) * 31.1))
+      : parseFraction(unit);
+    return {
+      grams: round3(count * unitGrams),
+      label: `${count}× ${unit} ${isOz ? "oz" : "g"}`,
+    };
   }
-  const inline = KNOWN_MAKERS.find((m) =>
-    name.toLowerCase().includes(m.toLowerCase()),
-  );
-  return inline ?? null;
+
+  if (/\b1\s*kilo\b/i.test(name) || /\b1000\s*g\b/i.test(name)) {
+    return { grams: 1000, label: "1 kg" };
+  }
+
+  const oz = name.match(/(\d+\/\d+|\d+(?:[.,]\d+)?)\s*oz/i);
+  if (oz) {
+    const token = oz[1];
+    const grams = OZ_WEIGHTS[token] ?? round3(parseFraction(token) * 31.1);
+    return { grams, label: `${token} oz` };
+  }
+
+  const grams = name.match(/(\d+(?:[.,]\d+)?)\s*g\b/i);
+  if (grams) {
+    const n = round3(Number(grams[1].replace(",", ".")));
+    return { grams: n, label: `${n} g` };
+  }
+
+  return { grams: 0, label: "" };
+}
+
+function detectCategory(
+  name: string,
+  metal: Metal,
+  kind: Kind,
+): { category: string; subcat: string } {
+  const n = name.toLowerCase();
+  if (metal === "platinum")
+    return { category: "platina-palladium", subcat: "platina" };
+  if (metal === "palladium")
+    return { category: "platina-palladium", subcat: "palladium" };
+  if (n.includes("čnb") || n.includes("czech national bank")) {
+    return {
+      category: "mince-cnb",
+      subcat: metal === "silver" ? "cnb-stribrne" : "cnb-zlate",
+    };
+  }
+  if (metal === "silver") {
+    return {
+      category: "investicni-stribro",
+      subcat: kind === "mince" ? "mince" : "slitky",
+    };
+  }
+  return {
+    category: "investicni-zlato",
+    subcat: kind === "mince" ? "mince" : "slitky",
+  };
 }
 
 function detectYear(name: string): number | null {
@@ -101,40 +186,7 @@ function detectYear(name: string): number | null {
   return null;
 }
 
-const METAL_CZ: Record<string, string> = {
-  gold: "Zlatý",
-  silver: "Stříbrný",
-  platinum: "Platinový",
-  palladium: "Palladiový",
-};
-
-function formatWeight(grams: number): string {
-  if (grams >= 1000) return `${round3(grams / 1000)} kg`;
-  return `${grams} g`;
-}
-
-function buildCzechName(
-  englishName: string,
-  metal: string,
-  kindCz: string,
-  grams: number,
-): string {
-  const cleaned = englishName
-    .replace(/\s*\|\s*/g, " ")
-    .replace(/Gold|Silver|Platinum|Palladium/gi, "")
-    .replace(/\s+Bar\b/gi, "")
-    .replace(/\s+Coin\b/gi, "")
-    .replace(/Kilo/gi, "")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-  const adj = METAL_CZ[metal] ?? "";
-  const w = formatWeight(grams);
-  const tail = cleaned.replace(/^[\d/.,x\s]+(oz|g)?\b/i, "").trim();
-  const base = `${kindCz} ${adj.toLowerCase()} ${w}`.replace(/\s+/g, " ").trim();
-  return tail ? `${base} – ${tail}` : base;
-}
-
-function fineness(metal: string): string {
+function fineness(metal: Metal): string {
   switch (metal) {
     case "gold":
       return "999.9";
@@ -143,9 +195,114 @@ function fineness(metal: string): string {
     case "platinum":
     case "palladium":
       return "999.5";
-    default:
-      return "999.9";
   }
+}
+
+function buildCzechName(opts: {
+  metal: Metal;
+  kind: Kind;
+  manufacturer: string | null;
+  series: string | null;
+  year: number | null;
+  weightLabel: string;
+}): string {
+  const { metal, kind, manufacturer, series, year, weightLabel } = opts;
+  const adj =
+    kind === "slitek" ? METAL_ADJ[metal].masc : METAL_ADJ[metal].fem;
+  const parts =
+    kind === "slitek"
+      ? [manufacturer, adj, "slitek", weightLabel, series]
+      : [
+          manufacturer,
+          adj,
+          "mince",
+          series,
+          year ? String(year) : null,
+          weightLabel,
+        ];
+  return parts
+    .filter((p): p is string => Boolean(p && p.trim()))
+    .join(" ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+async function seed(): Promise<void> {
+  const feed = await fetchPriceFeed(true);
+  const entries = [...feed.values()];
+  console.log(`Fetched ${entries.length} feed items`);
+
+  const featuredCount = Math.min(6, entries.length);
+  const featuredIdx = new Set<number>();
+  while (featuredIdx.size < featuredCount) {
+    featuredIdx.add(Math.floor(Math.random() * entries.length));
+  }
+
+  const products: InsertProduct[] = entries.map((item, i) => {
+    const metal = detectMetal(item.name);
+    const series = detectSeries(item.name);
+    const kind = detectKind(item.name, series);
+    const { grams, label } = detectWeight(item.name);
+    const manufacturer = detectManufacturer(item.name);
+    const year = detectYear(item.name);
+    const { category, subcat } = detectCategory(item.name, metal, kind);
+    const name = buildCzechName({
+      metal,
+      kind,
+      manufacturer,
+      series,
+      year,
+      weightLabel: label,
+    });
+    return {
+      id: item.code,
+      name,
+      manufacturer,
+      weightGrams: grams,
+      fineness: fineness(metal),
+      category,
+      subcat,
+      year,
+      featured: featuredIdx.has(i),
+      active: true,
+      image: `https://goldspot.cz/obrazky/${item.code}/1.webp`,
+      description: `${name}. Originál: ${item.name}.`,
+      sortOrder: i,
+    };
+  });
+
+  for (const p of products) {
+    await db
+      .insert(productsTable)
+      .values(p)
+      .onConflictDoUpdate({
+        target: productsTable.id,
+        set: {
+          name: p.name,
+          manufacturer: p.manufacturer,
+          weightGrams: p.weightGrams,
+          fineness: p.fineness,
+          category: p.category,
+          subcat: p.subcat,
+          year: p.year,
+          image: p.image,
+          description: p.description,
+          sortOrder: p.sortOrder,
+        },
+      });
+  }
+  console.log(`${products.length} products imported successfully`);
+
+  for (const [key, value] of Object.entries(CONTENT_DEFAULTS)) {
+    await db
+      .insert(contentBlocksTable)
+      .values({ key, value })
+      .onConflictDoNothing();
+  }
+  console.log(`Seeded ${Object.keys(CONTENT_DEFAULTS).length} content blocks`);
+
+  await db.insert(settingsTable).values({ id: 1 }).onConflictDoNothing();
+  console.log("Settings ensured");
 }
 
 const CONTENT_DEFAULTS: Record<string, string> = {
@@ -187,75 +344,6 @@ const CONTENT_DEFAULTS: Record<string, string> = {
     "SWISS GOLD s.r.o., IČO 12345678, Praha. Investiční zlato je osvobozeno od DPH.",
   footer_copyright: "© 2026 SwissGold.cz — Všechna práva vyhrazena.",
 };
-
-async function seed(): Promise<void> {
-  const feed = await fetchPriceFeed(true);
-  const entries = [...feed.values()];
-  console.log(`Fetched ${entries.length} feed items`);
-
-  const featuredCount = Math.min(6, entries.length);
-  const featuredIdx = new Set<number>();
-  while (featuredIdx.size < featuredCount) {
-    featuredIdx.add(Math.floor(Math.random() * entries.length));
-  }
-
-  const products: InsertProduct[] = entries.map((item, i) => {
-    const { metal, category } = detectMetal(item.name);
-    const { subcat, kindCz } = detectKind(item.name);
-    const grams = detectWeightGrams(item.name);
-    const manufacturer = detectManufacturer(item.name);
-    const year = detectYear(item.name);
-    const name = buildCzechName(item.name, metal, kindCz, grams);
-    return {
-      id: item.code,
-      name,
-      manufacturer,
-      weightGrams: grams,
-      fineness: fineness(metal),
-      category,
-      subcat,
-      year,
-      featured: featuredIdx.has(i),
-      active: true,
-      image: `https://goldspot.cz/obrazky/${item.code}/1.webp`,
-      description: `${name}. Originál: ${item.name}.`,
-      sortOrder: i,
-    };
-  });
-
-  for (const p of products) {
-    await db
-      .insert(productsTable)
-      .values(p)
-      .onConflictDoUpdate({
-        target: productsTable.id,
-        set: {
-          name: p.name,
-          manufacturer: p.manufacturer,
-          weightGrams: p.weightGrams,
-          fineness: p.fineness,
-          category: p.category,
-          subcat: p.subcat,
-          year: p.year,
-          image: p.image,
-          description: p.description,
-          sortOrder: p.sortOrder,
-        },
-      });
-  }
-  console.log(`Upserted ${products.length} products`);
-
-  for (const [key, value] of Object.entries(CONTENT_DEFAULTS)) {
-    await db
-      .insert(contentBlocksTable)
-      .values({ key, value })
-      .onConflictDoNothing();
-  }
-  console.log(`Seeded ${Object.keys(CONTENT_DEFAULTS).length} content blocks`);
-
-  await db.insert(settingsTable).values({ id: 1 }).onConflictDoNothing();
-  console.log("Settings ensured");
-}
 
 seed()
   .then(() => {

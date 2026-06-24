@@ -18,6 +18,10 @@ tags:
     description: Editable website content
   - name: admin
     description: Admin operations (JWT protected)
+  - name: auth
+    description: Customer authentication
+  - name: account
+    description: Customer account (cookie protected)
 paths:
   /healthz:
     get:
@@ -207,6 +211,173 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/register:
+    post:
+      operationId: registerCustomer
+      tags: [auth]
+      summary: Register a new customer (sets auth cookie)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerRegister"
+      responses:
+        "201":
+          description: Created customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: Invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: loginCustomer
+      tags: [auth]
+      summary: Customer login (sets auth cookie)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerLogin"
+      responses:
+        "200":
+          description: Logged in customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logoutCustomer
+      tags: [auth]
+      summary: Customer logout (clears auth cookie)
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [account]
+      security: [{ cookieAuth: [] }]
+      summary: Current logged-in customer
+      responses:
+        "200":
+          description: Customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /account/profile:
+    put:
+      operationId: updateProfile
+      tags: [account]
+      security: [{ cookieAuth: [] }]
+      summary: Update profile details
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerProfileUpdate"
+      responses:
+        "200":
+          description: Updated customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+
+  /account/password:
+    put:
+      operationId: changePassword
+      tags: [account]
+      security: [{ cookieAuth: [] }]
+      summary: Change password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordChange"
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Invalid current password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /account/orders:
+    get:
+      operationId: getMyOrders
+      tags: [account]
+      security: [{ cookieAuth: [] }]
+      summary: Orders for the logged-in customer
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+
+  /account/buybacks:
+    get:
+      operationId: getMyBuybacks
+      tags: [account]
+      security: [{ cookieAuth: [] }]
+      summary: Buyback requests for the logged-in customer
+      responses:
+        "200":
+          description: Buybacks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Buyback"
 
   /admin/login:
     post:
@@ -540,12 +711,57 @@ paths:
               schema:
                 $ref: "#/components/schemas/PriceOverride"
 
+  /admin/customers:
+    get:
+      operationId: adminListCustomers
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: List customers with order/buyback counts
+      responses:
+        "200":
+          description: Customers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminCustomerSummary"
+
+  /admin/customers/{id}:
+    get:
+      operationId: adminGetCustomer
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: Get a customer with their orders and buybacks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Customer detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminCustomerDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sg_customer_token
   schemas:
     HealthStatus:
       type: object
@@ -776,6 +992,7 @@ components:
         id: { type: string }
         orderNumber: { type: string }
         status: { type: string }
+        customerId: { type: ["string", "null"] }
         customerName: { type: string }
         customerEmail: { type: string }
         customerPhone: { type: ["string", "null"] }
@@ -825,6 +1042,7 @@ components:
         id: { type: string }
         requestNumber: { type: string }
         status: { type: string }
+        customerId: { type: ["string", "null"] }
         customerName: { type: string }
         customerEmail: { type: string }
         customerPhone: { type: ["string", "null"] }
@@ -944,6 +1162,108 @@ components:
         newBuybacks: { type: integer }
         spotGoldCzkPerGram: { type: number }
         eurCzk: { type: number }
+
+    Customer:
+      type: object
+      required:
+        - id
+        - email
+        - createdAt
+      properties:
+        id: { type: string }
+        email: { type: string }
+        firstName: { type: ["string", "null"] }
+        lastName: { type: ["string", "null"] }
+        phone: { type: ["string", "null"] }
+        address: { type: ["string", "null"] }
+        city: { type: ["string", "null"] }
+        zip: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+
+    CustomerRegister:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 6 }
+        firstName: { type: ["string", "null"] }
+        lastName: { type: ["string", "null"] }
+        phone: { type: ["string", "null"] }
+
+    CustomerLogin:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+
+    CustomerProfileUpdate:
+      type: object
+      properties:
+        firstName: { type: ["string", "null"] }
+        lastName: { type: ["string", "null"] }
+        phone: { type: ["string", "null"] }
+        address: { type: ["string", "null"] }
+        city: { type: ["string", "null"] }
+        zip: { type: ["string", "null"] }
+
+    PasswordChange:
+      type: object
+      required:
+        - currentPassword
+        - newPassword
+      properties:
+        currentPassword: { type: string }
+        newPassword: { type: string, minLength: 6 }
+
+    MessageResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message: { type: string }
+
+    AdminCustomerSummary:
+      type: object
+      required:
+        - id
+        - email
+        - createdAt
+        - orderCount
+        - totalSpentCzk
+        - buybackCount
+      properties:
+        id: { type: string }
+        email: { type: string }
+        firstName: { type: ["string", "null"] }
+        lastName: { type: ["string", "null"] }
+        phone: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        orderCount: { type: integer }
+        totalSpentCzk: { type: number }
+        buybackCount: { type: integer }
+
+    AdminCustomerDetail:
+      type: object
+      required:
+        - customer
+        - orders
+        - buybacks
+      properties:
+        customer:
+          $ref: "#/components/schemas/Customer"
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+        buybacks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Buyback"
 
     ErrorResponse:
       type: object

@@ -9,6 +9,7 @@ import {
   priceOverridesTable,
   contentBlocksTable,
   settingsTable,
+  customersTable,
 } from "@workspace/db";
 import {
   AdminLoginBody,
@@ -281,6 +282,66 @@ router.put("/overrides/:productId", async (req, res): Promise<void> => {
     })
     .returning();
   res.json(updated);
+});
+
+router.get("/customers", async (_req, res): Promise<void> => {
+  const [customers, orders, buybacks] = await Promise.all([
+    db.select().from(customersTable).orderBy(desc(customersTable.createdAt)),
+    db.select().from(ordersTable),
+    db.select().from(buybacksTable),
+  ]);
+  const summaries = customers.map((c) => {
+    const custOrders = orders.filter((o) => o.customerId === c.id);
+    const totalSpentCzk = custOrders.reduce((sum, o) => sum + (o.totalCzk ?? 0), 0);
+    return {
+      id: c.id,
+      email: c.email,
+      firstName: c.firstName,
+      lastName: c.lastName,
+      phone: c.phone,
+      createdAt: c.createdAt,
+      orderCount: custOrders.length,
+      totalSpentCzk,
+      buybackCount: buybacks.filter((b) => b.customerId === c.id).length,
+    };
+  });
+  res.json(summaries);
+});
+
+router.get("/customers/:id", async (req, res): Promise<void> => {
+  const rows = await db
+    .select()
+    .from(customersTable)
+    .where(eq(customersTable.id, req.params.id))
+    .limit(1);
+  const customer = rows[0];
+  if (!customer) {
+    res.status(404).json({ error: "Zákazník nenalezen" });
+    return;
+  }
+  const { passwordHash: _passwordHash, ...publicCustomer } = customer;
+  const [orders, buybacks] = await Promise.all([
+    db
+      .select()
+      .from(ordersTable)
+      .where(eq(ordersTable.customerId, customer.id))
+      .orderBy(desc(ordersTable.createdAt)),
+    db
+      .select()
+      .from(buybacksTable)
+      .where(eq(buybacksTable.customerId, customer.id))
+      .orderBy(desc(buybacksTable.createdAt)),
+  ]);
+  const ordersWithItems = await Promise.all(
+    orders.map(async (o) => {
+      const items = await db
+        .select()
+        .from(orderItemsTable)
+        .where(eq(orderItemsTable.orderId, o.id));
+      return { ...o, items };
+    }),
+  );
+  res.json({ customer: publicCustomer, orders: ordersWithItems, buybacks });
 });
 
 export default router;

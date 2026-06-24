@@ -7,8 +7,15 @@ import {
   buybacksTable,
 } from "@workspace/db";
 import { CreateOrderBody, CreateBuybackBody } from "@workspace/api-zod";
+import { CUSTOMER_COOKIE, verifyCustomerToken } from "../lib/customerAuth";
 
 const router: IRouter = Router();
+
+function currentCustomerId(req: { cookies?: Record<string, unknown> }): string | null {
+  const token = req.cookies?.[CUSTOMER_COOKIE];
+  if (!token || typeof token !== "string") return null;
+  return verifyCustomerToken(token)?.sub ?? null;
+}
 
 function makeNumber(prefix: string): string {
   const now = new Date();
@@ -30,6 +37,7 @@ router.post("/orders", async (req, res): Promise<void> => {
     .insert(ordersTable)
     .values({
       orderNumber,
+      customerId: currentCustomerId(req),
       customerName: body.customerName,
       customerEmail: body.customerEmail,
       customerPhone: body.customerPhone ?? null,
@@ -75,6 +83,7 @@ router.post("/buybacks", async (req, res): Promise<void> => {
     .insert(buybacksTable)
     .values({
       requestNumber,
+      customerId: currentCustomerId(req),
       customerName: body.customerName,
       customerEmail: body.customerEmail,
       customerPhone: body.customerPhone ?? null,

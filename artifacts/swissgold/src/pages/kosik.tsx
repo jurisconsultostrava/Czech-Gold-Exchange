@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import {
   useGetPrices,
@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCart } from "@/lib/cart-context";
+import { useCustomerAuth } from "@/lib/customer-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Minus, Plus, Trash2, ShoppingCart } from "lucide-react";
 
@@ -38,6 +39,7 @@ export default function Kosik() {
     query: { refetchInterval: 60000, queryKey: getGetPricesQueryKey() },
   });
   const { toast } = useToast();
+  const { customer } = useCustomerAuth();
   const createOrder = useCreateOrder();
 
   const [name, setName] = useState("");
@@ -46,6 +48,21 @@ export default function Kosik() {
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [zip, setZip] = useState("");
+  const [prefilled, setPrefilled] = useState(false);
+
+  useEffect(() => {
+    if (!customer || prefilled) return;
+    const fullName = [customer.firstName, customer.lastName]
+      .filter(Boolean)
+      .join(" ");
+    setName((v) => v || fullName);
+    setEmail((v) => v || customer.email);
+    setPhone((v) => v || customer.phone || "");
+    setAddress((v) => v || customer.address || "");
+    setCity((v) => v || customer.city || "");
+    setZip((v) => v || customer.zip || "");
+    setPrefilled(true);
+  }, [customer, prefilled]);
   const [delivery, setDelivery] = useState("personal");
   const [payment, setPayment] = useState("bank_transfer");
   const [vs] = useState(() => String(Math.floor(1000000 + Math.random() * 9000000)));

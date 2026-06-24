@@ -1,7 +1,5 @@
 import jwt from "jsonwebtoken";
-
-const JWT_SECRET =
-  process.env.JWT_SECRET ?? process.env.SESSION_SECRET ?? "dev-insecure-secret";
+import { JWT_SECRET } from "./jwtSecret";
 
 export interface AdminTokenPayload {
   email: string;

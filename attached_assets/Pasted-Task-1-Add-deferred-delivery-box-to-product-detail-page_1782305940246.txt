@@ -1,0 +1,64 @@
+Task 1 — Add deferred delivery box to product detail page
+On the product detail page (/detail/[id]), add a "Terminované dodání" box in the right panel, positioned between the main price box and the quantity/bulk discount section.
+The box must look exactly like goldenhouse.cz — golden background, dark text:
+background: rgba(192,155,75,0.85)
+border-radius: 16px
+padding: 20px
+color: #000
+Box content:
+
+Header row: clock icon (SVG) + bold text "Zvýhodněná cena s terminovaným dodáním"
+Subtitle: "Odložené dodání za 12 měsíců"
+Price: PRICE_VAT × 0.91 formatted as CZK, font-size 1.8rem, font-weight 600
+Below price: small text "Osvobozeno od DPH"
+Discount badge next to price: "−9 %" in dark pill background: rgba(0,0,0,0.2); border-radius: 999px; padding: 2px 10px
+Qty selector (−/input/+) same style as main price box
+"KOUPIT" button — full width, dark background #000, gold text #C09B4B, border-radius 8px
+
+The deferred price must update live when spot prices refresh (same as main price).
+
+Task 2 — Fix product import
+The product seeding needs these fixes:
+
+Czech names — use this translation logic:
+
+Detect metal: if name contains "Silver" → stříbrný/stříbrná, "Platinum" → platinový/platinová, "Palladium" → palladiový/palladiová, else zlatý/zlatá
+Detect kind: if name contains "Coin" or "Round" or known coin series (Maple Leaf, Krugerrand, Britannia, Eagle, Buffalo, Philharmonic, Kangaroo, Panda, Libertad, Ark, Elephant, Lunar, Koala, Kookaburra, Emu, Platypus, Dragon, Tudor, Queen's Beast, St George, Angel, Bond, Star Wars, Bitcoin) → mince, else slitek
+Bar name: {Manufacturer} {adj} slitek {weight} [{series}]
+Coin name: {Mint} {adj} mince {series} {year} {weight}
+
+
+Manufacturer detection from pipe-separated NAME field:
+
+"Argor-Heraeus" → Argor-Heraeus
+"Valcambi" → Valcambi
+"PAMP" → PAMP Suisse
+"Royal Mint" → Royal Mint
+"Royal Canadian Mint" → Royal Canadian Mint
+"Perth Mint" → Perth Mint
+"Münze Österreich" or "Vienna Philharmonic" → Münze Österreich
+"South African Mint" or "Krugerrand" → South African Mint
+"U.S. Mint" or "American Eagle" or "American Buffalo" → U.S. Mint
+"Umicore" → Umicore
+"Metalor" → Metalor
+"Heraeus" → Heraeus
+
+
+Weight detection from name:
+
+"1 Kilo" or "1000g" → 1000g
+"500g" → 500g, "250g" → 250g, "100g" → 100g, "50g" → 50g, "20g" → 20g, "10g" → 10g, "5g" → 5g, "2g" → 2g, "1g" → 1g
+"1 oz" → 31.1g, "1/2 oz" → 15.55g, "1/4 oz" → 7.78g, "1/10 oz" → 3.11g
+
+
+Category + subcat detection:
+
+Silver in name → investicni-stribro / (mince or slitky)
+Platinum in name → platina-palladium / platina
+Palladium in name → platina-palladium / palladium
+"ČNB" or "Czech National Bank" in name → mince-cnb / (cnb-zlate or cnb-stribrne)
+else → investicni-zlato / (mince or slitky)
+
+
+Image URL: https://goldspot.cz/obrazky/{CODE}/1.webp
+After seed, show count: "X products imported successfully"

@@ -6,21 +6,20 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface Buyback {
+export interface Customer {
   id: string;
-  requestNumber: string;
-  status: string;
+  email: string;
   /** @nullable */
-  customerId?: string | null;
-  customerName: string;
-  customerEmail: string;
+  firstName?: string | null;
   /** @nullable */
-  customerPhone?: string | null;
+  lastName?: string | null;
   /** @nullable */
-  itemDescription?: string | null;
+  phone?: string | null;
   /** @nullable */
-  estimatedCzk?: number | null;
+  address?: string | null;
   /** @nullable */
-  adminNote?: string | null;
+  city?: string | null;
+  /** @nullable */
+  zip?: string | null;
   createdAt: Date;
 }

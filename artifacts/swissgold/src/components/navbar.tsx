@@ -1,12 +1,16 @@
 import { Link } from "wouter";
 import { useCart } from "@/lib/cart-context";
 import { useCurrency } from "@/lib/currency-context";
+import { useCustomerAuth } from "@/lib/customer-auth";
 import { ShoppingCart, Menu, User } from "lucide-react";
 import { Button } from "./ui/button";
 
 export function Navbar() {
   const { itemCount } = useCart();
   const { currency, toggle } = useCurrency();
+  const { isAuthenticated, customer } = useCustomerAuth();
+  const accountLabel =
+    customer?.firstName || customer?.email?.split("@")[0] || "Můj účet";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-bg-1/80 backdrop-blur-md">
@@ -30,13 +34,23 @@ export function Navbar() {
           >
             {currency}
           </button>
-          <Link
-            href="/admin/login"
-            className="hidden sm:flex items-center gap-1.5 text-sm text-ink-2 hover:text-gold transition-colors"
-          >
-            <User className="w-4 h-4" />
-            <span>Přihlásit</span>
-          </Link>
+          {isAuthenticated ? (
+            <Link
+              href="/ucet"
+              className="hidden sm:flex items-center gap-1.5 text-sm text-ink-2 hover:text-gold transition-colors max-w-[10rem] truncate"
+            >
+              <User className="w-4 h-4 shrink-0" />
+              <span className="truncate">{accountLabel}</span>
+            </Link>
+          ) : (
+            <Link
+              href="/prihlaseni"
+              className="hidden sm:flex items-center gap-1.5 text-sm text-ink-2 hover:text-gold transition-colors"
+            >
+              <User className="w-4 h-4" />
+              <span>Přihlásit</span>
+            </Link>
+          )}
           <Link href="/kosik" className="relative text-ink-1 hover:text-gold transition-colors">
             <ShoppingCart className="w-5 h-5" />
             {itemCount > 0 && (

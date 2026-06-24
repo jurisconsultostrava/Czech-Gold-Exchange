@@ -14,6 +14,7 @@ export const ordersTable = pgTable("orders", {
     .$defaultFn(() => crypto.randomUUID()),
   orderNumber: text("order_number").notNull().unique(),
   status: text("status").notNull().default("new"),
+  customerId: text("customer_id"),
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email").notNull(),
   customerPhone: text("customer_phone"),

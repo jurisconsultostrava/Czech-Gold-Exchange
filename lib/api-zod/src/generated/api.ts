@@ -188,6 +188,161 @@ export const CreateBuybackBody = zod.object({
 
 
 /**
+ * @summary Register a new customer (sets auth cookie)
+ */
+export const registerCustomerBodyPasswordMin = 6;
+
+
+
+export const RegisterCustomerBody = zod.object({
+  "email": zod.string().email(),
+  "password": zod.string().min(registerCustomerBodyPasswordMin),
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "phone": zod.string().nullish()
+})
+
+
+/**
+ * @summary Customer login (sets auth cookie)
+ */
+export const LoginCustomerBody = zod.object({
+  "email": zod.string().email(),
+  "password": zod.string()
+})
+
+export const LoginCustomerResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "zip": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Customer logout (clears auth cookie)
+ */
+export const LogoutCustomerResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * @summary Current logged-in customer
+ */
+export const GetMeResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "zip": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update profile details
+ */
+export const UpdateProfileBody = zod.object({
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "zip": zod.string().nullish()
+})
+
+export const UpdateProfileResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "zip": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Change password
+ */
+export const changePasswordBodyNewPasswordMin = 6;
+
+
+
+export const ChangePasswordBody = zod.object({
+  "currentPassword": zod.string(),
+  "newPassword": zod.string().min(changePasswordBodyNewPasswordMin)
+})
+
+export const ChangePasswordResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * @summary Orders for the logged-in customer
+ */
+export const GetMyOrdersResponseItem = zod.object({
+  "id": zod.string(),
+  "orderNumber": zod.string(),
+  "status": zod.string(),
+  "customerId": zod.string().nullish(),
+  "customerName": zod.string(),
+  "customerEmail": zod.string(),
+  "customerPhone": zod.string().nullish(),
+  "customerAddress": zod.string().nullish(),
+  "customerCity": zod.string().nullish(),
+  "customerZip": zod.string().nullish(),
+  "paymentMethod": zod.string(),
+  "deliveryMethod": zod.string(),
+  "totalCzk": zod.number(),
+  "totalEur": zod.number(),
+  "currency": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "productId": zod.string(),
+  "productName": zod.string(),
+  "weightGrams": zod.number().nullish(),
+  "quantity": zod.number(),
+  "unitPriceCzk": zod.number(),
+  "unitPriceEur": zod.number()
+}))
+})
+export const GetMyOrdersResponse = zod.array(GetMyOrdersResponseItem)
+
+
+/**
+ * @summary Buyback requests for the logged-in customer
+ */
+export const GetMyBuybacksResponseItem = zod.object({
+  "id": zod.string(),
+  "requestNumber": zod.string(),
+  "status": zod.string(),
+  "customerId": zod.string().nullish(),
+  "customerName": zod.string(),
+  "customerEmail": zod.string(),
+  "customerPhone": zod.string().nullish(),
+  "itemDescription": zod.string().nullish(),
+  "estimatedCzk": zod.number().nullish(),
+  "adminNote": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+export const GetMyBuybacksResponse = zod.array(GetMyBuybacksResponseItem)
+
+
+/**
  * @summary Admin login, returns a JWT
  */
 export const AdminLoginBody = zod.object({
@@ -286,6 +441,7 @@ export const AdminListOrdersResponseItem = zod.object({
   "id": zod.string(),
   "orderNumber": zod.string(),
   "status": zod.string(),
+  "customerId": zod.string().nullish(),
   "customerName": zod.string(),
   "customerEmail": zod.string(),
   "customerPhone": zod.string().nullish(),
@@ -322,6 +478,7 @@ export const AdminGetOrderResponse = zod.object({
   "id": zod.string(),
   "orderNumber": zod.string(),
   "status": zod.string(),
+  "customerId": zod.string().nullish(),
   "customerName": zod.string(),
   "customerEmail": zod.string(),
   "customerPhone": zod.string().nullish(),
@@ -361,6 +518,7 @@ export const AdminUpdateOrderResponse = zod.object({
   "id": zod.string(),
   "orderNumber": zod.string(),
   "status": zod.string(),
+  "customerId": zod.string().nullish(),
   "customerName": zod.string(),
   "customerEmail": zod.string(),
   "customerPhone": zod.string().nullish(),
@@ -396,6 +554,7 @@ export const AdminListBuybacksResponseItem = zod.object({
   "id": zod.string(),
   "requestNumber": zod.string(),
   "status": zod.string(),
+  "customerId": zod.string().nullish(),
   "customerName": zod.string(),
   "customerEmail": zod.string(),
   "customerPhone": zod.string().nullish(),
@@ -418,6 +577,7 @@ export const AdminGetBuybackResponse = zod.object({
   "id": zod.string(),
   "requestNumber": zod.string(),
   "status": zod.string(),
+  "customerId": zod.string().nullish(),
   "customerName": zod.string(),
   "customerEmail": zod.string(),
   "customerPhone": zod.string().nullish(),
@@ -444,6 +604,7 @@ export const AdminUpdateBuybackResponse = zod.object({
   "id": zod.string(),
   "requestNumber": zod.string(),
   "status": zod.string(),
+  "customerId": zod.string().nullish(),
   "customerName": zod.string(),
   "customerEmail": zod.string(),
   "customerPhone": zod.string().nullish(),
@@ -572,6 +733,85 @@ export const AdminUpdateOverrideResponse = zod.object({
   "marginCzk": zod.number().nullish(),
   "marginPct": zod.number().nullish(),
   "active": zod.boolean()
+})
+
+
+/**
+ * @summary List customers with order/buyback counts
+ */
+export const AdminListCustomersResponseItem = zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "orderCount": zod.number(),
+  "totalSpentCzk": zod.number(),
+  "buybackCount": zod.number()
+})
+export const AdminListCustomersResponse = zod.array(AdminListCustomersResponseItem)
+
+
+/**
+ * @summary Get a customer with their orders and buybacks
+ */
+export const AdminGetCustomerParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AdminGetCustomerResponse = zod.object({
+  "customer": zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "zip": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+}),
+  "orders": zod.array(zod.object({
+  "id": zod.string(),
+  "orderNumber": zod.string(),
+  "status": zod.string(),
+  "customerId": zod.string().nullish(),
+  "customerName": zod.string(),
+  "customerEmail": zod.string(),
+  "customerPhone": zod.string().nullish(),
+  "customerAddress": zod.string().nullish(),
+  "customerCity": zod.string().nullish(),
+  "customerZip": zod.string().nullish(),
+  "paymentMethod": zod.string(),
+  "deliveryMethod": zod.string(),
+  "totalCzk": zod.number(),
+  "totalEur": zod.number(),
+  "currency": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "productId": zod.string(),
+  "productName": zod.string(),
+  "weightGrams": zod.number().nullish(),
+  "quantity": zod.number(),
+  "unitPriceCzk": zod.number(),
+  "unitPriceEur": zod.number()
+}))
+})),
+  "buybacks": zod.array(zod.object({
+  "id": zod.string(),
+  "requestNumber": zod.string(),
+  "status": zod.string(),
+  "customerId": zod.string().nullish(),
+  "customerName": zod.string(),
+  "customerEmail": zod.string(),
+  "customerPhone": zod.string().nullish(),
+  "itemDescription": zod.string().nullish(),
+  "estimatedCzk": zod.number().nullish(),
+  "adminNote": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+}))
 })
 
 
