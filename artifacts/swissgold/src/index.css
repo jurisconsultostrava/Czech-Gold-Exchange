@@ -54,25 +54,25 @@
   --color-bg-2: hsl(var(--bg-2));
   --color-bg-3: hsl(var(--bg-3));
 
-  --radius: 0;
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
-  --radius-xl: 0;
+  --radius: 2px;
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
 }
 
 :root, .dark {
-  --bg-0: 0 0% 0%;
-  --bg-1: 0 0% 4%;
-  --bg-2: 0 0% 7%;
-  --bg-3: 0 0% 10%;
+  --bg-0: 240 7% 4%;
+  --bg-1: 240 7% 5%;
+  --bg-2: 240 5% 8%;
+  --bg-3: 240 7% 11%;
   
-  --gold: 41 48% 52%;
-  --gold-2: 39 56% 62%;
+  --gold: 40 47% 60%;
+  --gold-2: 41 52% 69%;
   
-  --ink-1: 37 38% 94%;
-  --ink-2: 40 16% 67%;
-  --ink-3: 27 6% 40%;
+  --ink-1: 41 40% 94%;
+  --ink-2: 43 16% 74%;
+  --ink-3: 39 7% 51%;
   
   --font-display: 'Manrope', sans-serif;
   --font-body: 'Inter', sans-serif;
@@ -132,4 +132,19 @@
     letter-spacing: 0.15em;
     color: hsl(var(--gold));
   }
+}
+
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+.ticker-track {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  animation: ticker-scroll 45s linear infinite;
+  will-change: transform;
+}
+.ticker-marquee:hover .ticker-track {
+  animation-play-state: paused;
 }

@@ -22,15 +22,22 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- API server: `artifacts/api-server` — routes in `src/routes/{catalog,shop,admin,adminIO}.ts`, seed in `src/scripts/seed.ts`
+- Storefront: `artifacts/swissgold` — pages in `src/pages`, shared UI in `src/components`
+- Design tokens (source of truth): `artifacts/swissgold/src/index.css` `:root` block
+- Reference design (decoded from the user's MHTML capture): `attached_assets/swissgold-reference.css`
+- DB schema: `@workspace/db` package; API contract: `@workspace/api-spec` (OpenAPI) → generated hooks/types in `@workspace/api-client-react`
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Live metal spot prices are proxied server-side; the client reads them via `useGetSpot`/`useGetPrices`.
+- Prices are stored in haléře (÷100). EUR display uses `eurCzk` from settings via a client-side `CurrencyProvider` (CZK/EUR toggle in the navbar) — no separate EUR price field.
+- Admin auth is JWT (bearer token in `localStorage` key `sg_admin_token`); import/export endpoints use plain `fetch`, everything else uses generated hooks.
+- Visual design intentionally matches the real SwissGold.cz (dark gold/black, Manrope/Inter/JetBrains Mono). See memory `swissgold-reference-design.md`.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Czech precious-metals e-commerce storefront: homepage, catalog (`/katalog`, category filter via URL `?category=`), product detail (`/detail/:id`), cart (`/kosik`, paylibo QR), buyback request + calculator (`/vykup`), about (`/o-nas`), and a JWT-protected admin area (`/admin`) with product/order/buyback management and XML/CSV import-export. Live spot-price ticker, CZK/EUR currency toggle, Czech UI throughout.
 
 ## User preferences
 

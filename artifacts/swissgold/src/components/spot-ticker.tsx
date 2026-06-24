@@ -1,26 +1,36 @@
-import { useEffect, useState } from "react";
-import { useGetSpot } from "@workspace/api-client-react";
+import { useGetSpot, getGetSpotQueryKey } from "@workspace/api-client-react";
 
 export function SpotTicker() {
   const { data: spotData } = useGetSpot({
-    query: { refetchInterval: 60000 },
+    query: { refetchInterval: 60000, queryKey: getGetSpotQueryKey() },
   });
 
   if (!spotData) return null;
 
-  return (
-    <div className="bg-gold text-bg-0 text-xs font-mono py-1.5 overflow-hidden whitespace-nowrap">
-      <div className="animate-in slide-in-from-right-full duration-1000 flex gap-8 px-4">
-        {spotData.spots.map((spot) => (
-          <span key={spot.metal} className="flex gap-2">
-            <span className="uppercase font-semibold">{spot.metal}</span>
-            <span>{spot.pricePerOzCzk.toLocaleString("cs-CZ")} Kč/oz</span>
-          </span>
-        ))}
-        <span className="flex gap-2 text-bg-1/80">
-          <span>EUR/CZK</span>
-          <span>{spotData.eurCzk.toFixed(2)}</span>
+  const items = [
+    ...spotData.spots.map((s) => ({
+      label: s.metal.toUpperCase(),
+      value: `${s.pricePerOzCzk.toLocaleString("cs-CZ")} Kč/oz`,
+    })),
+    { label: "EUR/CZK", value: spotData.eurCzk.toFixed(2) },
+  ];
+
+  const Track = ({ ariaHidden }: { ariaHidden?: boolean }) => (
+    <div className="ticker-track" aria-hidden={ariaHidden}>
+      {items.map((it, i) => (
+        <span key={i} className="inline-flex items-center gap-2 px-6 py-2.5">
+          <span className="font-semibold text-gold">{it.label}</span>
+          <span className="text-ink-2">{it.value}</span>
         </span>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="ticker-marquee relative z-[100] w-full overflow-hidden border-b border-gold/20 bg-gradient-to-b from-[#0d0d0f] to-[#131315] text-xs font-mono tracking-wide">
+      <div className="flex w-max">
+        <Track />
+        <Track ariaHidden />
       </div>
     </div>
   );

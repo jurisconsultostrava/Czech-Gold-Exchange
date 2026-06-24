@@ -1,11 +1,19 @@
-import { useState } from "react";
-import { useListProducts, useGetPrices } from "@workspace/api-client-react";
+import { useSearch, useLocation } from "wouter";
+import { useListProducts, useGetPrices, getGetPricesQueryKey } from "@workspace/api-client-react";
 import { ProductCard } from "@/components/product-card";
 
 export default function Katalog() {
-  const [category, setCategory] = useState<string>("");
+  const search = useSearch();
+  const [, setLocation] = useLocation();
+  const category = new URLSearchParams(search).get("category") || "";
+
+  const setCategory = (c: string) =>
+    setLocation(c ? `/katalog?category=${encodeURIComponent(c)}` : "/katalog");
+
   const { data: products } = useListProducts(category ? { category } : undefined);
-  const { data: prices } = useGetPrices({ query: { refetchInterval: 60000 } });
+  const { data: prices } = useGetPrices({
+    query: { refetchInterval: 60000, queryKey: getGetPricesQueryKey() },
+  });
 
   const categories = ["Zlato", "Stříbro", "Platina", "Palladium"];
 
@@ -34,10 +42,10 @@ export default function Katalog() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {products?.map((product) => (
-          <ProductCard 
-            key={product.id} 
-            product={product} 
-            price={prices?.find(p => p.id === product.id)} 
+          <ProductCard
+            key={product.id}
+            product={product}
+            price={prices?.find((p) => p.id === product.id)}
           />
         ))}
       </div>
