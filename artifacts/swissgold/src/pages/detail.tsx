@@ -123,16 +123,6 @@ export default function Detail() {
                 <span style={{ fontSize: "1.8rem", fontWeight: 600 }}>
                   {format(deferredUnitCzk)}
                 </span>
-                <span
-                  className="text-sm font-semibold"
-                  style={{
-                    background: "rgba(0,0,0,0.2)",
-                    borderRadius: 999,
-                    padding: "2px 10px",
-                  }}
-                >
-                  −{Math.round(deferredPct)} %
-                </span>
               </div>
               <p className="text-xs mt-1" style={{ color: "rgba(0,0,0,0.7)" }}>
                 Osvobozeno od DPH
