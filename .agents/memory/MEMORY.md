@@ -1,3 +1,4 @@
 - [SwissGold reference design](swissgold-reference-design.md) — decode the MHTML capture's quoted-printable CSS with Node (no python3); exact gold/ink/bg tokens + ticker marquee + card anatomy.
+- [SwissGold Railway deploy](swissgold-railway-deploy.md) — single combined service (Express serves API + Vite build); glibc image required (musl binaries pruned); SERVE_STATIC_DIR gates static serving so Replit is unaffected.
 - [SwissGold dual auth model](swissgold-auth.md) — admin = bearer JWT (localStorage); customer = httpOnly cookie `sg_customer_token` (auto-sent same-origin, no mutator change); JWT secret is fail-fast, never hardcode a fallback.
 - [SwissGold xaumanager feeds](swissgold-feeds.md) — TWO separate feeds: meistergold (product catalog → seed) + xml (live price/stock → /prices), joined by ITEM_ID===CODE. Don't merge.
