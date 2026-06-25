@@ -28,6 +28,15 @@ _Replace the heading above with the project's name, and this line with one sente
 - Reference design (decoded from the user's MHTML capture): `attached_assets/swissgold-reference.css`
 - DB schema: `@workspace/db` package; API contract: `@workspace/api-spec` (OpenAPI) → generated hooks/types in `@workspace/api-client-react`
 
+## Deploy on Railway
+
+Single web service (the Express API server also serves the built storefront) + a Railway Postgres plugin. Files: `Dockerfile`, `railway.json`, `scripts/railway-start.sh`, `.dockerignore`.
+
+- **Build**: Railway builds the `Dockerfile` (glibc `node:24-bookworm-slim` — NOT alpine, because the workspace prunes `*-musl` native binaries). It installs deps, builds libs + API bundle, then builds the storefront with `BASE_PATH=/`.
+- **Run**: `scripts/railway-start.sh` runs `drizzle-kit push` (schema sync), optionally seeds when `RUN_SEED=true`, then starts `node artifacts/api-server/dist/index.mjs`. The server reads `SERVE_STATIC_DIR` (set in the Dockerfile) to serve the frontend at `/` with SPA fallback; `/api/*` is the JSON API. Healthcheck: `/api/healthz`.
+- **Required env vars on Railway**: `DATABASE_URL` (from the Postgres plugin), `JWT_SECRET` (or `SESSION_SECRET`), `ADMIN_EMAIL`, `ADMIN_PASSWORD`. `PORT` is injected by Railway. Optional: `RUN_SEED=true` for first deploy, `RUN_MIGRATIONS=false` to skip the boot-time `drizzle-kit push` once the schema is stable, and feed overrides `PRODUCT_FEED_URL`/`PRICE_FEED_URL`/`SPOT_API_URL`.
+- The single-origin setup means customer auth cookies work without CORS/SameSite changes; `trust proxy` is enabled in production so `Secure` cookies are honored behind Railway's TLS proxy.
+
 ## Architecture decisions
 
 - Two separate xaumanager.cz feeds, joined by item ID: the **product feed** (`PRODUCT_FEED_URL`, `…/export/meistergold`) is the catalog source for the seed (authoritative material/weight/fineness/category/image); the **price feed** (`PRICE_FEED_URL`, `…/export/xml`) supplies live price/stock/buyback at request time.
