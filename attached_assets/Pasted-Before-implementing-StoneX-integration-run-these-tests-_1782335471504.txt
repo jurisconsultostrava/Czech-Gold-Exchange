@@ -1,0 +1,82 @@
+Before implementing StoneX integration, run these tests first:
+Test 1 — Fetch StoneX PDF and verify parsing
+Create a test script scripts/test-stonex.ts:
+typescript// 1. Fetch gold PDF
+const url = `https://stonexbullion.com/api/client/catalog/pdf/?t=${Date.now()}&url=%2Fen%2Fgold%2F&update_filters=true&metal_ids%5B%5D=1&term=&page=1`
+const res = await fetch(url)
+console.log('Status:', res.status)
+console.log('Content-Type:', res.headers.get('content-type'))
+const text = await res.text()
+console.log('First 500 chars:', text.slice(0, 500))
+console.log('Total length:', text.length)
+
+// 2. Try to parse first 10 lines
+const lines = text.split('\n').filter(l => l.trim())
+console.log('\nFirst 10 lines:')
+lines.slice(0, 10).forEach((l, i) => console.log(`${i}: ${l}`))
+
+// 3. Count how many lines look like product lines (contain EUR or g)
+const productLines = lines.filter(l => l.includes('€') || l.match(/\d+\.\d+g/))
+console.log(`\nProduct-like lines: ${productLines.length}`)
+console.log('Sample product lines:')
+productLines.slice(0, 5).forEach(l => console.log(' ', l))
+Run: npx tsx scripts/test-stonex.ts
+
+Test 2 — Verify current price feed
+typescript// scripts/test-prices.ts
+const res = await fetch('https://xaumanager.cz/api/export/xml?hash=moje-zlato-secret')
+const text = await res.text()
+// Parse first 3 items
+const matches = text.matchAll(/<SHOPITEM>.*?<CODE>(.*?)<\/CODE>.*?<PRICE_VAT>(.*?)<\/PRICE_VAT>.*?<PURCHASE_PRICE>(.*?)<\/PURCHASE_PRICE>/gs)
+let count = 0
+for (const m of matches) {
+  if (count++ > 2) break
+  console.log(`CODE: ${m[1]}, PRICE: ${parseInt(m[2])/100} Kč, PURCHASE: ${parseInt(m[3])/100} Kč`)
+}
+console.log('Feed accessible:', count > 0)
+Run: npx tsx scripts/test-prices.ts
+
+Test 3 — Verify spot API and EUR calculation
+typescript// scripts/test-spot.ts
+const res = await fetch('https://xaumanager.cz/api/public/spot')
+const data = await res.json()
+console.log('Spot data:', JSON.stringify(data, null, 2))
+
+const gold = data.spots.find(s => s.metal === 'gold')
+const eurCzk = data.eur_czk ?? 25.20  // fallback if null
+
+console.log('\nCalculations:')
+console.log(`EUR/CZK: ${eurCzk}`)
+console.log(`Gold CZK/g: ${gold.price_per_gram_czk}`)
+console.log(`Gold EUR/g: ${(gold.price_per_gram_czk / eurCzk).toFixed(4)}`)
+console.log(`1 oz gold value CZK: ${(gold.price_per_gram_czk * 31.1).toFixed(0)} Kč`)
+console.log(`1 oz gold value EUR: ${(gold.price_per_gram_czk * 31.1 / eurCzk).toFixed(2)} EUR`)
+
+// Verify example: Maple Leaf 1 oz
+// StoneX WE SELL = 111 EUR
+const stonexPremium = 111
+const marginCzk = 300
+const maplePriceCzk = (gold.price_per_gram_czk * 31.1) + (stonexPremium * eurCzk) + marginCzk
+console.log(`\nMaple Leaf 1 oz calculated price: ${maplePriceCzk.toFixed(0)} Kč`)
+console.log(`Compare with xaumanager feed price for same product (CODE check manually)`)
+Run: npx tsx scripts/test-spot.ts
+
+Test 4 — Check DB product count and sample
+typescript// scripts/test-db.ts
+import { PrismaClient } from '@prisma/client'
+const prisma = new PrismaClient()
+
+const count = await prisma.product.count()
+console.log(`Total products in DB: ${count}`)
+
+const sample = await prisma.product.findMany({ take: 5 })
+sample.forEach(p => console.log(`${p.id} | ${p.name} | ${p.weightGrams}g | ${p.category} | ${p.manufacturer}`))
+
+// Check if Maple Leaf exists
+const maple = await prisma.product.findFirst({ where: { name: { contains: 'Maple' } } })
+console.log('\nMaple Leaf in DB:', maple ? `${maple.id} — ${maple.name}` : 'NOT FOUND')
+
+await prisma.$disconnect()
+Run: npx tsx scripts/test-db.ts
+
+Report back results of all 4 tests before proceeding with implementation.
