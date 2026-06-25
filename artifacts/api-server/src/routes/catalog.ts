@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, ne } from "drizzle-orm";
 import {
   db,
   productsTable,
@@ -36,8 +36,19 @@ router.get("/products/featured", async (_req, res): Promise<void> => {
   const products = await db
     .select()
     .from(productsTable)
-    .where(and(eq(productsTable.active, true), eq(productsTable.featured, true)))
-    .orderBy(asc(productsTable.sortOrder), asc(productsTable.name));
+    .where(
+      and(
+        eq(productsTable.active, true),
+        isNotNull(productsTable.image),
+        ne(productsTable.image, ""),
+      ),
+    )
+    .orderBy(
+      desc(productsTable.featured),
+      asc(productsTable.sortOrder),
+      asc(productsTable.name),
+    )
+    .limit(8);
   res.json(products);
 });
 

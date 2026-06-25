@@ -1,0 +1,107 @@
+Task — StoneX wholesale price integration
+Replace the current fixed-price system with a live premium-based pricing engine.
+How pricing works:
+
+StoneX WE SELL = premium in EUR above spot that YOU pay to buy the product
+Your retail price = spot × weightGrams + StoneX premium + your margin
+Your buyback price = spot × weightGrams + StoneX WE BUY premium (negative = below spot)
+
+Step 1 — New database table for StoneX premiums:
+prismamodel StoneXPremium {
+  id             String   @id @default(cuid())
+  productId      String   // matches Product.id (CODE)
+  stonexName     String   // original English name from StoneX
+  buyPremiumEur  Float?   // WE BUY premium (can be negative)
+  sellTier1Qty   Int      @default(1)
+  sellTier1Eur   Float    // WE SELL premium for 1+ pcs
+  sellTier2Qty   Int?
+  sellTier2Eur   Float?
+  sellTier3Qty   Int?
+  sellTier3Eur   Float?
+  sellTier4Qty   Int?
+  sellTier4Eur   Float?
+  updatedAt      DateTime @updatedAt
+}
+Step 2 — New pricing calculation in /api/prices:
+Current response: {id, priceCzk, purchasePriceCzk, inStock}
+New response:
+typescript{
+  id: string,
+  // Retail price = spot × weight + StoneX sell premium tier1 + your margin
+  priceCzk: number,
+  priceEur: number,
+  // Buyback = spot × weight + StoneX buy premium (if exists)
+  purchasePriceCzk: number,
+  purchasePriceEur: number,
+  // Volume tiers (if StoneX has tiers)
+  tiers: Array<{ qty: number, priceCzk: number, priceEur: number }>,
+  // Deferred = retail × (1 - deferredDiscountPct/100)
+  deferredPriceCzk: number,
+  deferredPriceEur: number,
+  inStock: boolean,
+  // Price breakdown for detail page
+  breakdown: {
+    spotEurPerGram: number,
+    metalValueEur: number,
+    stonexPremiumEur: number,
+    yourMarginCzk: number,
+  }
+}
+Calculation logic:
+typescriptconst spotEurPerGram = currentSpot.gold_eur_per_gram  // from spot API
+const metalValueEur = spotEurPerGram × product.weightGrams
+const stonexPremium = StoneXPremium.sellTier1Eur ?? 0
+const marginCzk = getMargin(product)  // from Settings per category
+const priceEur = metalValueEur + stonexPremium
+const priceCzk = priceEur × eurToCzk + marginCzk
+
+const buyPremium = StoneXPremium.buyPremiumEur ?? 0
+const purchasePriceEur = metalValueEur + buyPremium
+const purchasePriceCzk = purchasePriceEur × eurToCzk
+For products without StoneX premium → fall back to xaumanager XML price (PRICE_VAT).
+Step 3 — StoneX PDF parser:
+Create scripts/parse-stonex.ts that:
+
+Fetches https://stonexbullion.com/api/client/catalog/pdf/?t=${Date.now()}&url=%2Fen%2Fgold%2F&update_filters=true&metal_ids%5B%5D=1&term=&page=1 (gold) and equivalent URLs for silver (metal_ids[]=2), platinum (metal_ids[]=3), palladium (metal_ids[]=4)
+Parses the text PDF response — each line format: {NAME} {WE_BUY_EUR} {WE_BUY_PCT}% {QTY}+ {WE_SELL_EUR} {WE_SELL_PCT}% {WEIGHT}
+Matches StoneX NAME to Product by CODE — match logic:
+
+Normalize both names (lowercase, remove punctuation)
+Match on weight + series keywords (Maple Leaf, Krugerrand, Britannia etc.)
+Store match confidence score, only auto-insert if confidence > 0.85
+
+
+Upserts StoneXPremium table
+Prints report: X matched, Y unmatched, Z updated
+
+Step 4 — Admin panel: StoneX tab
+Add "StoneX ceník" tab in admin sidebar:
+
+"Synchronizovat StoneX" button → runs parser → shows report
+Table of all StoneXPremium entries:
+
+Columns: Produkt (name) | StoneX název | WE BUY | WE SELL tier1 | tier2 | tier3 | Naposledy aktualizováno
+Editable inline: click WE BUY or WE SELL values to edit manually
+"Nespárováno" badge for products without StoneX match
+
+
+Filter: show only unmatched products
+Manual match: for unmatched products, search StoneX name from dropdown, assign manually
+
+Step 5 — Update detail page price breakdown
+On product detail page, show price breakdown panel (collapsible, below main price box):
+Složení ceny:
+├── Spot zlata × hmotnost    2 613 Kč  (spot 2 793 Kč/g × 31.1 g)
+├── Velkoobchodní prémie       +2 730 Kč  (StoneX: 111 EUR × 24.60)
+├── Vaše marže                  +300 Kč
+└── Prodejní cena            5 643 Kč
+Toggle with "Zobrazit složení ceny →" link, collapse on click.
+Step 6 — Spot EUR/g calculation
+The spot API (/api/public/spot) returns price_per_gram_czk but not EUR. Add EUR calculation:
+typescriptconst spotGoldEurPerGram = spotGoldCzkPerGram / eurToCzk
+Use eurToCzk from Settings table (admin can update manually, or fetch from ECB).
+Note: StoneX PDF URL for other metals:
+
+Silver: metal_ids%5B%5D=2
+Platinum: metal_ids%5B%5D=3
+Palladium: metal_ids%5B%5D=4
