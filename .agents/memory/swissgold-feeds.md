@@ -8,11 +8,11 @@ description: The two distinct xaumanager.cz feeds and how they relate (catalog v
 Two **separate** feeds with **different XML schemas**, joined by a shared item ID. Do not merge them or key one by the other's field names.
 
 - **Product feed** (`PRODUCT_FEED_URL`, `…/export/meistergold`) — the product CATALOG; the seed builds the `products` table from it. It is the authoritative source for material, weight, fineness, category, and image — prefer it over name-regex guessing.
-- **Price feed** (`PRICE_FEED_URL`, `…/export/xml`) — live PRICE + STOCK + buyback, read at request time by the `/prices` route. Never use it as the catalog/product source.
+- **Price feed** (`PRICE_FEED_URL`) — live PRICE + STOCK + buyback, read at request time by the `/prices` route. Never use it as the catalog/product source. NOTE: this source was switched from the xaumanager `…/export/xml` feed to the **mergado shoptet-univerzalni XML** — see [swissgold-price-feed.md](swissgold-price-feed.md) for units (whole CZK, no ÷100, no margin) and the CODE→NAME matching.
 
-**Why it matters:** the two feeds enumerate the same 215 items, but only the price feed has live pricing/stock and only the product feed has clean catalog metadata. The seed and the runtime price path must stay on their respective feeds.
+**Why it matters:** the two feeds enumerate the same items, but only the price feed has live pricing/stock and only the product feed has clean catalog metadata. The seed and the runtime price path must stay on their respective feeds.
 
-**Join key:** the product feed's item id equals the price feed's code equals the image-host id, so the runtime join `feed.get(product.id)` works. If a future feed breaks that identity, the price join silently drops products (they vanish from `/prices`).
+**Join key:** the price feed match is `byCode.get(product.id)` first, then `byName.get(normalizeName(product.name))`. If a feed breaks the id/code identity AND the name differs, the price join silently drops products (they vanish from `/prices`).
 
 **Gotcha:** the product feed reports the same fineness for every metal (it is not metal-specific). Treat it as the supplier's declared value, not a derived truth.
 

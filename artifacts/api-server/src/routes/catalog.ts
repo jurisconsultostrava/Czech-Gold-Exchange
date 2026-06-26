@@ -6,7 +6,7 @@ import {
   priceOverridesTable,
   contentBlocksTable,
 } from "@workspace/db";
-import { fetchPriceFeed, fetchSpot } from "../lib/feeds";
+import { fetchPriceFeed, fetchSpot, normalizeName } from "../lib/feeds";
 import { computePrice } from "../lib/pricing";
 import { getSettings } from "../lib/settings";
 
@@ -76,7 +76,9 @@ router.get("/prices", async (req, res): Promise<void> => {
     const overrideMap = new Map(overrides.map((o) => [o.productId, o]));
     const prices = products
       .map((product) => {
-        const item = feed.get(product.id);
+        const item =
+          feed.byCode.get(product.id) ??
+          feed.byName.get(normalizeName(product.name));
         if (!item) return null;
         return computePrice(
           product,
