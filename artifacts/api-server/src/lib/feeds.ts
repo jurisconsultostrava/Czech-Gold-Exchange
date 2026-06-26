@@ -180,11 +180,95 @@ export async function fetchProductFeed(): Promise<ProductFeedItem[]> {
   return products;
 }
 
-export async function fetchSpot(force = false): Promise<SpotRaw> {
-  if (!force && spotCache && Date.now() - spotCache.ts < CACHE_TTL_MS) {
-    return spotCache.data;
+const OZT_GRAMS = 31.1034768;
+
+const GOLD_API_BASE = "https://www.goldapi.io/api";
+const GOLD_API_METALS: Array<{ symbol: string; metal: string }> = [
+  { symbol: "XAU", metal: "gold" },
+  { symbol: "XAG", metal: "silver" },
+  { symbol: "XPT", metal: "platinum" },
+  { symbol: "XPD", metal: "palladium" },
+];
+
+interface GoldApiQuote {
+  price?: number;
+  price_gram_24k?: number;
+}
+
+async function fetchGoldApiQuote(
+  symbol: string,
+  currency: string,
+): Promise<GoldApiQuote> {
+  const key = process.env.GOLDAPI_KEY;
+  if (!key) throw new Error("GOLDAPI_KEY is not set");
+  const res = await fetch(`${GOLD_API_BASE}/${symbol}/${currency}`, {
+    headers: { "x-access-token": key, "Content-Type": "application/json" },
+  });
+  if (!res.ok) {
+    throw new Error(`GoldAPI ${symbol}/${currency} responded ${res.status}`);
+  }
+  return (await res.json()) as GoldApiQuote;
+}
+
+/**
+ * Derive EUR/CZK from gold quoted in both currencies (GoldAPI is metals-only).
+ * Returns null if GoldAPI is unavailable so callers can fall back further.
+ */
+async function deriveEurCzkFromGoldApi(
+  knownGoldCzkOz?: number,
+): Promise<number | null> {
+  try {
+    const czkOz =
+      knownGoldCzkOz && knownGoldCzkOz > 0
+        ? knownGoldCzkOz
+        : toNumber((await fetchGoldApiQuote("XAU", "CZK")).price);
+    const eurOz = toNumber((await fetchGoldApiQuote("XAU", "EUR")).price);
+    if (czkOz > 0 && eurOz > 0) {
+      return Math.round((czkOz / eurOz) * 100) / 100;
+    }
+  } catch (err) {
+    logger.warn({ err }, "GoldAPI EUR/CZK derivation failed");
+  }
+  return null;
+}
+
+/**
+ * Fallback spot source (GoldAPI.io). Fetches the four metals in CZK and derives
+ * the EUR/CZK rate from gold quoted in both currencies (GoldAPI is metals-only).
+ */
+async function fetchSpotFromGoldApi(): Promise<SpotRaw> {
+  const results = await Promise.allSettled(
+    GOLD_API_METALS.map((m) => fetchGoldApiQuote(m.symbol, "CZK")),
+  );
+  const spots: SpotEntryRaw[] = [];
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled" && toNumber(r.value.price) > 0) {
+      const ozPrice = toNumber(r.value.price);
+      spots.push({
+        metal: GOLD_API_METALS[i].metal,
+        pricePerGramCzk:
+          toNumber(r.value.price_gram_24k) || ozPrice / OZT_GRAMS,
+        pricePerOzCzk: ozPrice,
+      });
+    } else if (r.status === "rejected") {
+      logger.warn(
+        { err: r.reason, symbol: GOLD_API_METALS[i].symbol },
+        "GoldAPI metal quote failed",
+      );
+    }
+  });
+  if (spots.length === 0) {
+    throw new Error("GoldAPI returned no metal prices");
   }
 
+  const goldCzkOz = spots.find((s) => s.metal === "gold")?.pricePerOzCzk;
+  const eurCzk = await deriveEurCzkFromGoldApi(goldCzkOz);
+
+  logger.info({ count: spots.length }, "Spot served from GoldAPI fallback");
+  return { spots, eurCzk, ts: String(Date.now()) };
+}
+
+async function fetchSpotFromPrimary(): Promise<SpotRaw> {
   const res = await fetch(SPOT_API_URL);
   if (!res.ok) {
     throw new Error(`Spot feed responded ${res.status}`);
@@ -201,11 +285,36 @@ export async function fetchSpot(force = false): Promise<SpotRaw> {
     pricePerOzCzk: toNumber(s["price_per_oz_czk"]),
   }));
 
-  const data: SpotRaw = {
+  return {
     spots,
     eurCzk: json.eur_czk == null ? null : toNumber(json.eur_czk),
     ts: String(json.ts ?? Date.now()),
   };
+}
+
+export async function fetchSpot(force = false): Promise<SpotRaw> {
+  if (!force && spotCache && Date.now() - spotCache.ts < CACHE_TTL_MS) {
+    return spotCache.data;
+  }
+
+  let data: SpotRaw;
+  try {
+    data = await fetchSpotFromPrimary();
+    if (data.spots.length === 0) {
+      throw new Error("Primary spot feed returned no metals");
+    }
+    // Primary often omits the EUR/CZK rate; backfill it from GoldAPI so the
+    // ticker shows a live rate instead of the static settings fallback.
+    if (!(data.eurCzk && data.eurCzk > 0)) {
+      data = { ...data, eurCzk: await deriveEurCzkFromGoldApi() };
+    }
+  } catch (primaryErr) {
+    logger.warn(
+      { err: primaryErr },
+      "Primary spot feed failed; falling back to GoldAPI",
+    );
+    data = await fetchSpotFromGoldApi();
+  }
 
   spotCache = { data, ts: Date.now() };
   return data;
