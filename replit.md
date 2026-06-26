@@ -39,9 +39,10 @@ Single web service (the Express API server also serves the built storefront) + a
 
 ## Architecture decisions
 
-- Two separate xaumanager.cz feeds, joined by item ID: the **product feed** (`PRODUCT_FEED_URL`, `…/export/meistergold`) is the catalog source for the seed (authoritative material/weight/fineness/category/image); the **price feed** (`PRICE_FEED_URL`, `…/export/xml`) supplies live price/stock/buyback at request time.
+- The **product feed** (`PRODUCT_FEED_URL`, xaumanager.cz `…/export/meistergold`) is the catalog source for the seed (authoritative material/weight/fineness/category/image). The **price feed** (`PRICE_FEED_URL`, the mergado.com shoptet-univerzalni XML) supplies live price/stock/buyback at request time, matched to each product by `CODE` (=`product.id`) first, then by normalized `NAME` as a fallback.
+- **Price unit + margin model**: the mergado price feed quotes the **final published retail price incl. VAT in whole CZK** — used as-is (NO ÷100 haléře conversion, NO category/global margin added). `sellPriceCzk` defaults to the feed price; per-product `price_overrides` (marginPct/marginCzk, opt-in `active`) can still adjust it. NOTE: the old xaumanager price feed was in haléře (÷100); if you ever switch `PRICE_FEED_URL` back, restore the conversion in `lib/feeds.ts`.
 - Live metal spot prices are proxied server-side; the client reads them via `useGetSpot`/`useGetPrices`.
-- Prices are stored in haléře (÷100). EUR display uses `eurCzk` from settings via a client-side `CurrencyProvider` (CZK/EUR toggle in the navbar) — no separate EUR price field.
+- EUR display uses `eurCzk` from settings via a client-side `CurrencyProvider` (CZK/EUR toggle in the navbar) — no separate EUR price field; EUR is derived from the CZK price at request time.
 - Admin auth is JWT (bearer token in `localStorage` key `sg_admin_token`); import/export endpoints use plain `fetch`, everything else uses generated hooks.
 - Visual design intentionally matches the real SwissGold.cz (dark gold/black, Manrope/Inter/JetBrains Mono). See memory `swissgold-reference-design.md`.
 

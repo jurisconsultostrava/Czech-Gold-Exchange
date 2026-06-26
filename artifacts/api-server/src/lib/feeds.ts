@@ -3,7 +3,7 @@ import { logger } from "./logger";
 
 export const PRICE_FEED_URL =
   process.env.PRICE_FEED_URL ??
-  "https://xaumanager.cz/api/export/xml?hash=moje-zlato-secret";
+  "https://feeds.mergado.com/meister-shoptet-univerzalni-cz-ecced3c2ba9a75f24b1a62e84323594a.xml";
 export const PRODUCT_FEED_URL =
   process.env.PRODUCT_FEED_URL ??
   "https://xaumanager.cz/api/export/meistergold?hash=moje-zlato-secret";
@@ -13,8 +13,8 @@ export const SPOT_API_URL =
 export interface FeedItem {
   code: string;
   name: string;
-  priceVatHaler: number;
-  purchasePriceHaler: number;
+  priceVatCzk: number;
+  purchasePriceCzk: number;
   amount: number;
   availability: string;
 }
@@ -44,7 +44,16 @@ export interface SpotRaw {
 
 const CACHE_TTL_MS = 60_000;
 
-let feedCache: { data: Map<string, FeedItem>; ts: number } | null = null;
+/**
+ * Parsed price feed indexed two ways so a product can be matched by its code
+ * (`product.id === CODE`) first, then by name as a fallback.
+ */
+export interface PriceFeed {
+  byCode: Map<string, FeedItem>;
+  byName: Map<string, FeedItem>;
+}
+
+let feedCache: { data: PriceFeed; ts: number } | null = null;
 let spotCache: { data: SpotRaw; ts: number } | null = null;
 
 const parser = new XMLParser({ ignoreAttributes: true, trimValues: true });
@@ -54,14 +63,25 @@ function toNumber(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/**
+ * Normalize a product/feed name for fallback matching: strip diacritics,
+ * lowercase, and collapse whitespace so "1 oz  Gold Bar" === "1 Oz Gold Bar".
+ */
+export function normalizeName(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function asArray<T>(value: T | T[] | undefined | null): T[] {
   if (value == null) return [];
   return Array.isArray(value) ? value : [value];
 }
 
-export async function fetchPriceFeed(
-  force = false,
-): Promise<Map<string, FeedItem>> {
+export async function fetchPriceFeed(force = false): Promise<PriceFeed> {
   if (!force && feedCache && Date.now() - feedCache.ts < CACHE_TTL_MS) {
     return feedCache.data;
   }
@@ -76,25 +96,34 @@ export async function fetchPriceFeed(
   };
 
   const items = asArray(parsed.SHOP?.SHOPITEM) as Array<Record<string, unknown>>;
-  const map = new Map<string, FeedItem>();
+  const byCode = new Map<string, FeedItem>();
+  const byName = new Map<string, FeedItem>();
 
   for (const raw of items) {
     const code = String(raw["CODE"] ?? "").trim();
-    if (!code) continue;
+    const name = String(raw["NAME"] ?? "").trim();
+    if (!code && !name) continue;
     const stock = raw["STOCK"] as { AMOUNT?: unknown } | undefined;
-    map.set(code, {
+    // The feed quotes the final retail price in whole CZK; use it as-is.
+    const item: FeedItem = {
       code,
-      name: String(raw["NAME"] ?? "").trim(),
-      priceVatHaler: toNumber(raw["PRICE_VAT"]),
-      purchasePriceHaler: toNumber(raw["PURCHASE_PRICE"]),
+      name,
+      priceVatCzk: toNumber(raw["PRICE_VAT"]),
+      purchasePriceCzk: toNumber(raw["PURCHASE_PRICE"]),
       amount: toNumber(stock?.AMOUNT),
       availability: String(raw["AVAILABILITY_IN_STOCK"] ?? "").trim(),
-    });
+    };
+    if (code) byCode.set(code, item);
+    if (name) byName.set(normalizeName(name), item);
   }
 
-  feedCache = { data: map, ts: Date.now() };
-  logger.info({ count: map.size }, "Price feed refreshed");
-  return map;
+  const data: PriceFeed = { byCode, byName };
+  feedCache = { data, ts: Date.now() };
+  logger.info(
+    { codes: byCode.size, names: byName.size },
+    "Price feed refreshed",
+  );
+  return data;
 }
 
 interface RawParam {
