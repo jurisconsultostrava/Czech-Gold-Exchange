@@ -55,6 +55,11 @@ function Router() {
   return (
     <Switch>
       <Route path="/admin/login" component={AdminLogin} />
+      <Route path="/admin">
+        <RequireAdmin>
+          <AdminDashboard />
+        </RequireAdmin>
+      </Route>
       <Route path="/admin/:rest*">
         <RequireAdmin>
           <AdminDashboard />
