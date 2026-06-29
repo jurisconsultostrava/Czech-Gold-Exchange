@@ -23,11 +23,15 @@ export function formatIban(iban: string): string {
 }
 
 /**
- * Variabilní symbol = last 8 digits of the order's creation timestamp.
+ * Variabilní symbol derived from the order number. The Czech VS must be
+ * numeric and at most 10 digits, so we strip non-digits and keep the last 10
+ * (e.g. "SG-260629-1234" -> "2606291234").
  */
-export function variableSymbolFromTimestamp(timestamp: string | number | Date): string {
-  const ms = new Date(timestamp).getTime();
-  return String(ms).slice(-8);
+export function variableSymbolFromOrderNumber(orderNumber: string): string {
+  const digits = orderNumber.replace(/\D/g, "").slice(-10);
+  if (digits) return digits;
+  // Fallback for malformed/non-numeric order numbers: last 10 digits of now.
+  return String(Date.now()).slice(-10);
 }
 
 /**

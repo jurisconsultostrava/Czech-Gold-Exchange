@@ -26,7 +26,7 @@ import {
   BANK_ACCOUNT_CZK,
   BANK_CODE_CZK,
   paylibCzkQrUrl,
-  variableSymbolFromTimestamp,
+  variableSymbolFromOrderNumber,
 } from "@/lib/qr-payment";
 import { Minus, Plus, Trash2, ShoppingCart } from "lucide-react";
 
@@ -76,6 +76,7 @@ export default function Kosik() {
   const [payment, setPayment] = useState("bank_transfer");
   const [completedOrder, setCompletedOrder] = useState<{
     orderNumber: string;
+    customerName: string;
     createdAt: string;
     totalCzk: number;
     totalEur: number;
@@ -133,6 +134,7 @@ export default function Kosik() {
         onSuccess: (order) => {
           setCompletedOrder({
             orderNumber: order.orderNumber,
+            customerName: order.customerName,
             createdAt: order.createdAt,
             totalCzk: order.totalCzk,
             totalEur: order.totalEur,
@@ -151,11 +153,11 @@ export default function Kosik() {
   };
 
   if (completedOrder) {
-    const vs = variableSymbolFromTimestamp(completedOrder.createdAt);
+    const vs = variableSymbolFromOrderNumber(completedOrder.orderNumber);
     const qrUrl = paylibCzkQrUrl({
       amountCzk: completedOrder.totalCzk,
       variableSymbol: vs,
-      message: `SwissGold ${completedOrder.orderNumber}`,
+      message: `${completedOrder.customerName}/${completedOrder.orderNumber}`,
     });
     return (
       <div className="container mx-auto px-4 py-24 max-w-2xl">
