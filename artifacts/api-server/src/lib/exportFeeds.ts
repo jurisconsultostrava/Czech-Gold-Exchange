@@ -15,6 +15,7 @@ import {
 } from "./feeds";
 import { computePrice, type ComputedPrice } from "./pricing";
 import { getSettings } from "./settings";
+import { logger } from "./logger";
 
 export function getShopUrl(): string {
   return (process.env.SHOP_URL ?? "https://swissgold.cz").replace(/\/+$/, "");
@@ -45,6 +46,56 @@ export class EmptyFeedError extends Error {
     super(message);
     this.name = "EmptyFeedError";
   }
+}
+
+/**
+ * Default minimum share of active products that must match the live price feed
+ * before {@link buildFeedProducts} considers the feed healthy. Below this the
+ * feed is still served, but a warning is logged so a degraded match rate (e.g. a
+ * feed format change that drops half the matches) doesn't silently delist
+ * products. Override with `FEED_MIN_MATCH_RATIO` (0–1; set to 0 to disable).
+ */
+export const DEFAULT_MIN_MATCH_RATIO = 0.5;
+
+/**
+ * Read the configured minimum match ratio from `FEED_MIN_MATCH_RATIO`, falling
+ * back to {@link DEFAULT_MIN_MATCH_RATIO} when unset or invalid (non-numeric or
+ * outside the 0–1 range).
+ */
+export function getMinMatchRatio(): number {
+  const raw = process.env.FEED_MIN_MATCH_RATIO;
+  if (raw === undefined || raw.trim() === "") return DEFAULT_MIN_MATCH_RATIO;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    return DEFAULT_MIN_MATCH_RATIO;
+  }
+  return parsed;
+}
+
+export interface MatchRate {
+  activeCount: number;
+  matchedCount: number;
+  /** matchedCount / activeCount (0 when there are no active products). */
+  ratio: number;
+  threshold: number;
+  /** True when a partial match falls below the threshold (worth a warning). */
+  degraded: boolean;
+}
+
+/**
+ * Evaluate the product↔price-feed match rate. A *partial* match below the
+ * threshold is flagged as degraded; a total miss is left to
+ * {@link EmptyFeedError}, and an empty catalog is not a feed regression. Pure:
+ * no IO, no logging.
+ */
+export function evaluateMatchRate(
+  activeCount: number,
+  matchedCount: number,
+  threshold: number = getMinMatchRatio(),
+): MatchRate {
+  const ratio = activeCount === 0 ? 0 : matchedCount / activeCount;
+  const degraded = activeCount > 0 && matchedCount > 0 && ratio < threshold;
+  return { activeCount, matchedCount, ratio, threshold, degraded };
 }
 
 /**
@@ -117,6 +168,20 @@ export async function buildFeedProducts(
   if (matched.length === 0) {
     throw new EmptyFeedError();
   }
+
+  const rate = evaluateMatchRate(products.length, matched.length);
+  if (rate.degraded) {
+    logger.warn(
+      {
+        activeCount: rate.activeCount,
+        matchedCount: rate.matchedCount,
+        ratio: Number(rate.ratio.toFixed(3)),
+        threshold: rate.threshold,
+      },
+      "Price-feed match rate below threshold — feed may be silently delisting products",
+    );
+  }
+
   return matched;
 }
 

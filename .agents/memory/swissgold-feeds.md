@@ -14,6 +14,8 @@ Two **separate** feeds with **different XML schemas**, joined by a shared item I
 
 **Join key:** the price feed match is `byCode.get(product.id)` first, then `byName.get(normalizeName(product.name))`. If a feed breaks the id/code identity AND the name differs, the price join silently drops products (they vanish from `/prices`).
 
+**Two guards protect the export feeds against this silent drop:** a *total* miss (zero matches) throws `EmptyFeedError` → the feed routes 502 instead of serving an empty document; a *partial* miss below `FEED_MIN_MATCH_RATIO` (default 0.5) is still served but logs a `logger.warn` so a half-broken feed (format change dropping half the matches) doesn't quietly delist products as a healthy 200. Keep both — the ratio guard catches what the empty guard misses.
+
 **Gotcha:** the product feed reports the same fineness for every metal (it is not metal-specific). Treat it as the supplier's declared value, not a derived truth.
 
 Known cosmetic limit: the Czech name builder can collapse two distinct variants to the same display name (e.g. plain vs "Minted"); ids stay distinct and the original supplier name is preserved in the product description.

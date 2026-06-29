@@ -1,14 +1,18 @@
-import { test } from "node:test";
+import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import type { Product, Settings, PriceOverride } from "@workspace/db";
 import { normalizeName, type FeedItem, type PriceFeed } from "./feeds";
 import { computePrice } from "./pricing";
+import { logger } from "./logger";
 import {
   buildFeedProducts,
   buildHeurekaXml,
   buildGoogleXml,
+  DEFAULT_MIN_MATCH_RATIO,
   EmptyFeedError,
   escapeXml,
+  evaluateMatchRate,
+  getMinMatchRatio,
   getShopUrl,
   matchFeedProducts,
   type FeedProduct,
@@ -371,4 +375,113 @@ test("feed routes serve an error (not an empty document) on EmptyFeedError", asy
   }
   assert.equal(xmlBuilt, false, "no XML must be produced for an empty feed");
   assert.equal(status, 502);
+});
+
+/**
+ * Tests for the degraded-match-rate guard. The EmptyFeedError guard only fires
+ * on a *total* miss; a subtler regression (a feed format change that drops half
+ * the matches) would still publish a partial feed as a healthy 200, quietly
+ * delisting many products. evaluateMatchRate flags that degraded state so
+ * buildFeedProducts can warn about it.
+ */
+
+test("evaluateMatchRate flags a partial match below the threshold", () => {
+  // 4 of 10 active products matched (40%) is below the 50% default.
+  const rate = evaluateMatchRate(10, 4, 0.5);
+  assert.equal(rate.degraded, true);
+  assert.equal(rate.ratio, 0.4);
+  assert.equal(rate.activeCount, 10);
+  assert.equal(rate.matchedCount, 4);
+  assert.equal(rate.threshold, 0.5);
+});
+
+test("evaluateMatchRate does not flag a healthy match rate", () => {
+  assert.equal(evaluateMatchRate(10, 9, 0.5).degraded, false);
+  // Exactly at the threshold is acceptable (not below it).
+  assert.equal(evaluateMatchRate(10, 5, 0.5).degraded, false);
+});
+
+test("evaluateMatchRate never flags a total miss or an empty catalog", () => {
+  // Zero matches is EmptyFeedError's job, not a degraded warning.
+  assert.equal(evaluateMatchRate(10, 0, 0.5).degraded, false);
+  // No active products is not a feed regression.
+  assert.equal(evaluateMatchRate(0, 0, 0.5).degraded, false);
+});
+
+test("getMinMatchRatio defaults and honors a valid FEED_MIN_MATCH_RATIO", () => {
+  const original = process.env.FEED_MIN_MATCH_RATIO;
+  try {
+    delete process.env.FEED_MIN_MATCH_RATIO;
+    assert.equal(getMinMatchRatio(), DEFAULT_MIN_MATCH_RATIO);
+
+    process.env.FEED_MIN_MATCH_RATIO = "0.8";
+    assert.equal(getMinMatchRatio(), 0.8);
+
+    // Disabling the guard is allowed.
+    process.env.FEED_MIN_MATCH_RATIO = "0";
+    assert.equal(getMinMatchRatio(), 0);
+
+    // Invalid / out-of-range values fall back to the default.
+    process.env.FEED_MIN_MATCH_RATIO = "nope";
+    assert.equal(getMinMatchRatio(), DEFAULT_MIN_MATCH_RATIO);
+    process.env.FEED_MIN_MATCH_RATIO = "1.5";
+    assert.equal(getMinMatchRatio(), DEFAULT_MIN_MATCH_RATIO);
+  } finally {
+    if (original === undefined) delete process.env.FEED_MIN_MATCH_RATIO;
+    else process.env.FEED_MIN_MATCH_RATIO = original;
+  }
+});
+
+test("buildFeedProducts warns when the matched ratio falls below the threshold", async () => {
+  // 1 of 4 active products matches (25%) — a degraded feed that still serves.
+  const products = [
+    makeProduct({ id: "A", name: "A" }),
+    makeProduct({ id: "B-miss", name: "B" }),
+    makeProduct({ id: "C-miss", name: "C" }),
+    makeProduct({ id: "D-miss", name: "D" }),
+  ];
+  const feed = makeFeed([makeFeedItem({ code: "A", name: "A" })]);
+  const warn = mock.method(logger, "warn", () => {});
+  try {
+    const items = await buildFeedProducts(
+      stubSources({
+        fetchPriceFeed: async () => feed,
+        loadActiveProducts: async () => products,
+      }),
+    );
+    // The feed is still served (partial), not thrown away.
+    assert.equal(items.length, 1);
+    assert.equal(warn.mock.callCount(), 1);
+    const [meta] = warn.mock.calls[0].arguments as [Record<string, number>];
+    assert.equal(meta.activeCount, 4);
+    assert.equal(meta.matchedCount, 1);
+    assert.equal(meta.ratio, 0.25);
+  } finally {
+    warn.mock.restore();
+  }
+});
+
+test("buildFeedProducts does not warn when the matched ratio is healthy", async () => {
+  const products = [
+    makeProduct({ id: "A", name: "A" }),
+    makeProduct({ id: "B", name: "B" }),
+    makeProduct({ id: "C-miss", name: "C" }),
+  ];
+  const feed = makeFeed([
+    makeFeedItem({ code: "A", name: "A" }),
+    makeFeedItem({ code: "B", name: "B" }),
+  ]);
+  const warn = mock.method(logger, "warn", () => {});
+  try {
+    const items = await buildFeedProducts(
+      stubSources({
+        fetchPriceFeed: async () => feed,
+        loadActiveProducts: async () => products,
+      }),
+    );
+    assert.equal(items.length, 2);
+    assert.equal(warn.mock.callCount(), 0);
+  } finally {
+    warn.mock.restore();
+  }
 });
