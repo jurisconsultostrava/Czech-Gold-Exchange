@@ -1,14 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Product, Settings, PriceOverride } from "@workspace/db";
-import type { FeedItem } from "./feeds";
+import { normalizeName, type FeedItem, type PriceFeed } from "./feeds";
 import { computePrice } from "./pricing";
 import {
+  buildFeedProducts,
   buildHeurekaXml,
   buildGoogleXml,
+  EmptyFeedError,
   escapeXml,
   getShopUrl,
+  matchFeedProducts,
   type FeedProduct,
+  type FeedSources,
 } from "./exportFeeds";
 
 /**
@@ -240,4 +244,131 @@ test("escapeXml escapes all five XML metacharacters", () => {
     escapeXml(`& < > " '`),
     "&amp; &lt; &gt; &quot; &apos;",
   );
+});
+
+/**
+ * Tests for the product↔price-feed join (buildFeedProducts / matchFeedProducts).
+ * A silent regression here (wrong match key, an unmatched product slipping
+ * through, or an empty feed served as 200) could publish a stale or empty feed
+ * to Heureka/Zboží/Google without anyone noticing.
+ */
+
+function makeFeed(items: FeedItem[]): PriceFeed {
+  const byCode = new Map<string, FeedItem>();
+  const byName = new Map<string, FeedItem>();
+  for (const item of items) {
+    if (item.code) byCode.set(item.code, item);
+    if (item.name) byName.set(normalizeName(item.name), item);
+  }
+  return { byCode, byName };
+}
+
+function stubSources(over: Partial<FeedSources>): FeedSources {
+  return {
+    fetchPriceFeed: async () => makeFeed([]),
+    getSettings: async () => SETTINGS,
+    loadActiveProducts: async () => [],
+    loadOverrides: async () => [],
+    ...over,
+  };
+}
+
+test("matchFeedProducts matches by CODE first", () => {
+  const product = makeProduct({ id: "CODE-1", name: "Anything" });
+  // Same code, but a different name so a name match could not succeed.
+  const feed = makeFeed([
+    makeFeedItem({ code: "CODE-1", name: "Totally Different", priceVatCzk: 12345 }),
+  ]);
+  const matched = matchFeedProducts([product], feed, SETTINGS, []);
+  assert.equal(matched.length, 1);
+  assert.equal(matched[0].feedItem.priceVatCzk, 12345);
+});
+
+test("matchFeedProducts falls back to normalized NAME when CODE misses", () => {
+  const product = makeProduct({ id: "NO-CODE-MATCH", name: "Zlatý Slitek 1 Oz" });
+  // Feed item has a non-matching code but a name that normalizes to the same
+  // (diacritics stripped, lowercased, whitespace collapsed).
+  const feed = makeFeed([
+    makeFeedItem({ code: "OTHER", name: "zlaty  slitek   1 oz", priceVatCzk: 67890 }),
+  ]);
+  const matched = matchFeedProducts([product], feed, SETTINGS, []);
+  assert.equal(matched.length, 1);
+  assert.equal(matched[0].feedItem.priceVatCzk, 67890);
+});
+
+test("matchFeedProducts drops products with no feed match", () => {
+  const matched = makeProduct({ id: "HAS-PRICE", name: "Has Price" });
+  const orphan = makeProduct({ id: "NO-PRICE", name: "No Price" });
+  const feed = makeFeed([makeFeedItem({ code: "HAS-PRICE", name: "Has Price" })]);
+  const result = matchFeedProducts([matched, orphan], feed, SETTINGS, []);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].product.id, "HAS-PRICE");
+});
+
+test("matchFeedProducts applies an active price override on join", () => {
+  const product = makeProduct({ id: "OV-1", name: "Override Me" });
+  const feed = makeFeed([
+    makeFeedItem({ code: "OV-1", name: "Override Me", priceVatCzk: 50000 }),
+  ]);
+  const override: PriceOverride = {
+    productId: "OV-1",
+    marginCzk: null,
+    marginPct: 10,
+    active: true,
+  };
+  const result = matchFeedProducts([product], feed, SETTINGS, [override]);
+  assert.equal(result.length, 1);
+  assert.equal(Math.round(result[0].price.sellPriceCzk), 55000);
+});
+
+test("buildFeedProducts passes the matched count to the XML builders", async () => {
+  const products = [
+    makeProduct({ id: "A", name: "A" }),
+    makeProduct({ id: "B", name: "B" }),
+    makeProduct({ id: "C-unmatched", name: "C" }),
+  ];
+  const feed = makeFeed([
+    makeFeedItem({ code: "A", name: "A" }),
+    makeFeedItem({ code: "B", name: "B" }),
+  ]);
+  const items = await buildFeedProducts(
+    stubSources({
+      fetchPriceFeed: async () => feed,
+      loadActiveProducts: async () => products,
+    }),
+  );
+  assert.equal(items.length, 2);
+  // The XML builders receive exactly the matched products — one SHOPITEM each.
+  const xml = buildHeurekaXml(items);
+  assert.equal(xml.match(/<SHOPITEM>/g)?.length, 2);
+});
+
+test("buildFeedProducts throws EmptyFeedError when zero products match", async () => {
+  // Active products exist, but none of them appear in the live price feed.
+  const sources = stubSources({
+    loadActiveProducts: async () => [makeProduct({ id: "X", name: "X" })],
+    fetchPriceFeed: async () => makeFeed([]),
+  });
+  await assert.rejects(buildFeedProducts(sources), EmptyFeedError);
+});
+
+test("buildFeedProducts throws EmptyFeedError when there are no active products", async () => {
+  await assert.rejects(buildFeedProducts(stubSources({})), EmptyFeedError);
+});
+
+test("feed routes serve an error (not an empty document) on EmptyFeedError", async () => {
+  // The route handlers wrap buildFeedProducts in try/catch and respond 502.
+  // Simulate that contract: an EmptyFeedError must never reach an XML builder.
+  let xmlBuilt = false;
+  let status = 200;
+  try {
+    const items = await buildFeedProducts(stubSources({}));
+    xmlBuilt = true;
+    buildHeurekaXml(items);
+  } catch (err) {
+    assert.ok(err instanceof EmptyFeedError);
+    status = 502;
+  }
+  assert.equal(xmlBuilt, false, "no XML must be produced for an empty feed");
+  assert.equal(status, 502);
 });
