@@ -4,6 +4,7 @@ import { useCurrency } from "@/lib/currency-context";
 import { useCustomerAuth } from "@/lib/customer-auth";
 import { ShoppingCart, Menu, User } from "lucide-react";
 import { Button } from "./ui/button";
+import logoSwissgold from "../assets/logo-swissgold.png";
 
 export function Navbar() {
   const { itemCount } = useCart();
@@ -16,8 +17,12 @@ export function Navbar() {
     <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-bg-1/80 backdrop-blur-md">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-8">
-          <Link href="/" className="text-xl font-display font-medium tracking-wide">
-            SwissGold<span className="text-gold">.cz</span>
+          <Link href="/" className="flex items-center" aria-label="SwissGold.cz">
+            <img
+              src={logoSwissgold}
+              alt="SwissGold.cz"
+              className="h-7 w-auto"
+            />
           </Link>
           <nav className="hidden md:flex gap-6 text-sm font-medium">
             <Link href="/katalog" className="text-ink-2 hover:text-ink-1 transition-colors">Katalog</Link>
