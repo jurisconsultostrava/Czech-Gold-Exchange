@@ -14,6 +14,7 @@ import {
   buildHeurekaXml,
   buildGoogleXml,
 } from "../lib/exportFeeds";
+import { feedAlerts } from "../lib/feedAlerts";
 
 const router: IRouter = Router();
 
@@ -103,11 +104,13 @@ router.get("/prices", async (req, res): Promise<void> => {
 router.get("/feed/heureka", async (req, res): Promise<void> => {
   try {
     const items = await buildFeedProducts();
+    feedAlerts.recordSuccess("heureka");
     res.set("Content-Type", "application/xml; charset=utf-8");
     res.set("Cache-Control", "public, max-age=3600");
     res.send(buildHeurekaXml(items));
   } catch (err) {
     req.log.error({ err }, "Failed to build Heureka feed");
+    feedAlerts.recordFailure("heureka", err);
     res.status(502).json({ error: "Feed není momentálně dostupný" });
   }
 });
@@ -116,11 +119,13 @@ router.get("/feed/heureka", async (req, res): Promise<void> => {
 router.get("/feed/zbozi", async (req, res): Promise<void> => {
   try {
     const items = await buildFeedProducts();
+    feedAlerts.recordSuccess("zbozi");
     res.set("Content-Type", "application/xml; charset=utf-8");
     res.set("Cache-Control", "public, max-age=3600");
     res.send(buildHeurekaXml(items));
   } catch (err) {
     req.log.error({ err }, "Failed to build Zboží feed");
+    feedAlerts.recordFailure("zbozi", err);
     res.status(502).json({ error: "Feed není momentálně dostupný" });
   }
 });
@@ -128,11 +133,13 @@ router.get("/feed/zbozi", async (req, res): Promise<void> => {
 router.get("/feed/google", async (req, res): Promise<void> => {
   try {
     const items = await buildFeedProducts();
+    feedAlerts.recordSuccess("google");
     res.set("Content-Type", "application/xml; charset=utf-8");
     res.set("Cache-Control", "public, max-age=3600");
     res.send(buildGoogleXml(items));
   } catch (err) {
     req.log.error({ err }, "Failed to build Google feed");
+    feedAlerts.recordFailure("google", err);
     res.status(502).json({ error: "Feed není momentálně dostupný" });
   }
 });
