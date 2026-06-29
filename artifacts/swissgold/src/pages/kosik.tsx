@@ -19,6 +19,15 @@ import {
 import { useCart } from "@/lib/cart-context";
 import { useCustomerAuth } from "@/lib/customer-auth";
 import { useToast } from "@/hooks/use-toast";
+import {
+  getIban,
+  formatIban,
+  BANK_BIC,
+  BANK_ACCOUNT_CZK,
+  BANK_CODE_CZK,
+  paylibCzkQrUrl,
+  variableSymbolFromTimestamp,
+} from "@/lib/qr-payment";
 import { Minus, Plus, Trash2, ShoppingCart } from "lucide-react";
 
 const DELIVERY_OPTIONS = [
@@ -65,8 +74,12 @@ export default function Kosik() {
   }, [customer, prefilled]);
   const [delivery, setDelivery] = useState("personal");
   const [payment, setPayment] = useState("bank_transfer");
-  const [vs] = useState(() => String(Math.floor(1000000 + Math.random() * 9000000)));
-  const [completedOrderNumber, setCompletedOrderNumber] = useState<string | null>(null);
+  const [completedOrder, setCompletedOrder] = useState<{
+    orderNumber: string;
+    createdAt: string;
+    totalCzk: number;
+    totalEur: number;
+  } | null>(null);
 
   const lines = useMemo(() => {
     return items.map((item) => {
@@ -118,7 +131,12 @@ export default function Kosik() {
       },
       {
         onSuccess: (order) => {
-          setCompletedOrderNumber(order.orderNumber);
+          setCompletedOrder({
+            orderNumber: order.orderNumber,
+            createdAt: order.createdAt,
+            totalCzk: order.totalCzk,
+            totalEur: order.totalEur,
+          });
           clearCart();
         },
         onError: () => {
@@ -132,21 +150,103 @@ export default function Kosik() {
     );
   };
 
-  if (completedOrderNumber) {
+  if (completedOrder) {
+    const vs = variableSymbolFromTimestamp(completedOrder.createdAt);
+    const qrUrl = paylibCzkQrUrl({
+      amountCzk: completedOrder.totalCzk,
+      variableSymbol: vs,
+      message: `SwissGold ${completedOrder.orderNumber}`,
+    });
     return (
-      <div className="container mx-auto px-4 py-24 text-center max-w-2xl">
-        <p className="eyebrow mb-4">Děkujeme za objednávku</p>
-        <h1 className="text-4xl font-display text-ink-1 mb-6">Objednávka přijata</h1>
-        <p className="text-ink-2 mb-2">Vaše číslo objednávky je:</p>
-        <p className="text-3xl text-gold font-mono mb-8">{completedOrderNumber}</p>
-        <p className="text-ink-2 mb-10">
-          Na uvedený e-mail vám zašleme potvrzení a platební údaje. Děkujeme za důvěru.
-        </p>
-        <Link href="/katalog">
-          <Button className="bg-gold text-bg-0 hover:bg-gold-2 h-12 px-8 rounded-none">
-            Pokračovat v nákupu
-          </Button>
-        </Link>
+      <div className="container mx-auto px-4 py-24 max-w-2xl">
+        <div className="text-center">
+          <p className="eyebrow mb-4">Děkujeme za objednávku</p>
+          <h1 className="text-4xl font-display text-ink-1 mb-6">Objednávka přijata</h1>
+          <p className="text-ink-2 mb-2">Vaše číslo objednávky je:</p>
+          <p className="text-3xl text-gold font-mono mb-2">
+            {completedOrder.orderNumber}
+          </p>
+          <p className="text-ink-2 mb-10">
+            Na uvedený e-mail vám zašleme potvrzení. Pro dokončení uhraďte prosím
+            částku dle údajů níže.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {/* CZK QR platba */}
+          <div className="border border-gold/30 bg-gold/5 p-6 flex flex-col items-center text-center">
+            <p className="eyebrow mb-4">QR platba (CZK)</p>
+            <img
+              src={qrUrl}
+              alt="QR platba CZK"
+              className="w-48 h-48 bg-white p-2"
+            />
+            <dl className="text-sm text-ink-2 mt-4 space-y-1 w-full">
+              <div className="flex justify-between gap-4">
+                <dt>Účet</dt>
+                <dd className="font-mono text-ink-1">
+                  {BANK_ACCOUNT_CZK}/{BANK_CODE_CZK}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>Částka</dt>
+                <dd className="font-mono text-ink-1">
+                  {Math.round(completedOrder.totalCzk).toLocaleString("cs-CZ")} Kč
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>Var. symbol</dt>
+                <dd className="font-mono text-ink-1">{vs}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>Splatnost</dt>
+                <dd className="text-ink-1">1 den</dd>
+              </div>
+            </dl>
+          </div>
+
+          {/* EUR platba */}
+          <div className="border border-bg-3 bg-bg-2 p-6">
+            <p className="eyebrow mb-4">Platba ze zahraničí (EUR)</p>
+            <dl className="text-sm text-ink-2 space-y-3">
+              <div>
+                <dt className="text-ink-3">IBAN</dt>
+                <dd className="font-mono text-ink-1 break-all">
+                  {formatIban(getIban("EUR"))}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-ink-3">BIC / SWIFT</dt>
+                <dd className="font-mono text-ink-1">{BANK_BIC}</dd>
+              </div>
+              <div>
+                <dt className="text-ink-3">Částka</dt>
+                <dd className="font-mono text-ink-1">
+                  {completedOrder.totalEur.toLocaleString("cs-CZ", {
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  €
+                </dd>
+              </div>
+              <div>
+                <dt className="text-ink-3">Var. symbol</dt>
+                <dd className="font-mono text-ink-1">{vs}</dd>
+              </div>
+              <div>
+                <dt className="text-ink-3">Splatnost</dt>
+                <dd className="text-ink-1">1 den</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+
+        <div className="text-center mt-10">
+          <Link href="/katalog">
+            <Button className="bg-gold text-bg-0 hover:bg-gold-2 h-12 px-8 rounded-none">
+              Pokračovat v nákupu
+            </Button>
+          </Link>
+        </div>
       </div>
     );
   }
@@ -336,17 +436,12 @@ export default function Kosik() {
             </div>
 
             {payment === "bank_transfer" && (
-              <div className="border border-gold/30 bg-gold/5 p-6 flex flex-col items-center text-center">
-                <p className="eyebrow mb-4">QR platba</p>
-                <img
-                  src={`https://api.paylibo.com/paylibo/generator/czech/image?accountNumber=123456789&bankCode=0800&amount=${Math.round(
-                    totalCzk
-                  )}&currency=CZK&vs=${vs}`}
-                  alt="QR platba"
-                  className="w-48 h-48 bg-white p-2"
-                />
-                <p className="text-sm text-ink-2 mt-4">
-                  Variabilní symbol: <span className="font-mono text-ink-1">{vs}</span>
+              <div className="border border-gold/30 bg-gold/5 p-6 text-sm text-ink-2">
+                <p className="eyebrow mb-2">QR platba</p>
+                <p>
+                  Po odeslání objednávky zobrazíme QR kód pro platbu v CZK
+                  (účet {BANK_ACCOUNT_CZK}/{BANK_CODE_CZK}) a platební údaje pro
+                  platbu v EUR (IBAN, BIC). Splatnost je 1 den.
                 </p>
               </div>
             )}

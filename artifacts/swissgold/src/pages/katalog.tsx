@@ -1,42 +1,89 @@
 import { useSearch, useLocation } from "wouter";
-import { useListProducts, useGetPrices, getGetPricesQueryKey } from "@workspace/api-client-react";
+import {
+  useListProducts,
+  useGetPrices,
+  getGetPricesQueryKey,
+} from "@workspace/api-client-react";
 import { ProductCard } from "@/components/product-card";
+
+interface CategoryTab {
+  label: string;
+  /** URL-friendly slug used in `?category=` (empty for "Vše"). */
+  slug: string;
+  category: string | null;
+  subcat: string | null;
+}
+
+const CATEGORY_TABS: CategoryTab[] = [
+  { label: "Vše", slug: "", category: null, subcat: null },
+  { label: "Zlato", slug: "Zlato", category: "investicni-zlato", subcat: null },
+  {
+    label: "Stříbro",
+    slug: "Stribro",
+    category: "investicni-stribro",
+    subcat: null,
+  },
+  {
+    label: "Platina",
+    slug: "Platina",
+    category: "platina-palladium",
+    subcat: "platina",
+  },
+  {
+    label: "Palladium",
+    slug: "Palladium",
+    category: "platina-palladium",
+    subcat: "palladium",
+  },
+];
 
 export default function Katalog() {
   const search = useSearch();
   const [, setLocation] = useLocation();
-  const category = new URLSearchParams(search).get("category") || "";
+  const slug = new URLSearchParams(search).get("category") || "";
 
-  const setCategory = (c: string) =>
-    setLocation(c ? `/katalog?category=${encodeURIComponent(c)}` : "/katalog");
+  const activeTab =
+    CATEGORY_TABS.find((t) => t.slug === slug) ?? CATEGORY_TABS[0];
 
-  const { data: products } = useListProducts(category ? { category } : undefined);
+  const setTab = (tab: CategoryTab) =>
+    setLocation(
+      tab.slug ? `/katalog?category=${encodeURIComponent(tab.slug)}` : "/katalog",
+    );
+
+  const params =
+    activeTab.category === null
+      ? undefined
+      : {
+          category: activeTab.category,
+          ...(activeTab.subcat ? { subcat: activeTab.subcat } : {}),
+        };
+
+  const { data: products } = useListProducts(params);
   const { data: prices } = useGetPrices({
     query: { refetchInterval: 60000, queryKey: getGetPricesQueryKey() },
   });
-
-  const categories = ["Zlato", "Stříbro", "Platina", "Palladium"];
 
   return (
     <div className="container mx-auto px-4 py-16">
       <div className="mb-12">
         <h1 className="text-4xl font-display mb-4">Katalog produktů</h1>
         <div className="flex gap-4 overflow-x-auto pb-4">
-          <button
-            onClick={() => setCategory("")}
-            className={`px-4 py-2 text-sm uppercase tracking-widest border ${!category ? 'border-gold text-gold' : 'border-bg-3 text-ink-2'} hover:border-gold hover:text-gold transition-colors`}
-          >
-            Vše
-          </button>
-          {categories.map((c) => (
-            <button
-              key={c}
-              onClick={() => setCategory(c)}
-              className={`px-4 py-2 text-sm uppercase tracking-widest border ${category === c ? 'border-gold text-gold' : 'border-bg-3 text-ink-2'} hover:border-gold hover:text-gold transition-colors`}
-            >
-              {c}
-            </button>
-          ))}
+          {CATEGORY_TABS.map((tab) => {
+            const isActive = tab.slug === activeTab.slug;
+            return (
+              <button
+                key={tab.label}
+                onClick={() => setTab(tab)}
+                className={`px-4 py-2 text-sm uppercase tracking-widest border whitespace-nowrap ${
+                  isActive
+                    ? "border-gold text-gold"
+                    : "border-bg-3 text-ink-2"
+                } hover:border-gold hover:text-gold transition-colors`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
