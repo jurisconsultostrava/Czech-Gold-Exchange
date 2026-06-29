@@ -2,7 +2,7 @@ import { useListFeaturedProducts, useGetPrices, getGetPricesQueryKey, useGetCont
 import { ProductCard } from "@/components/product-card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-const heroBg = "/assets/grok-image-9fd341e0-4851-4d4f-bdfe-7d70a0d5cbc9_1782713043597.jpg";
+const heroBg = "https://goldspot.cz/grok-image-9fd341e0-4851-4d4f-bdfe-7d70a0d5cbc9.jpg";
 
 export default function Home() {
   const { data: featured } = useListFeaturedProducts();
@@ -15,12 +15,10 @@ export default function Home() {
     <div className="w-full">
       {/* Hero Section */}
       <section className="relative min-h-[60vh] flex items-center border-b border-bg-3 overflow-hidden">
-        <img
-          src={heroBg}
-          alt=""
-          aria-hidden
-          className="absolute inset-0 w-full h-full object-cover object-right z-0"
-        />
+        <section
+  className="relative min-h-[60vh] flex items-center border-b border-bg-3 overflow-hidden"
+  style={{ backgroundImage: `url(${heroBg})`, backgroundSize: "cover", backgroundPosition: "right center" }}
+>
         <div className="absolute inset-0 z-[1] bg-gradient-to-r from-bg-0 via-bg-0/90 to-bg-0/30" />
         <div className="container mx-auto px-4 z-10">
           <div className="max-w-2xl">
