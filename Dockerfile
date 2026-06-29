@@ -14,10 +14,9 @@ COPY . .
 RUN pnpm install --frozen-lockfile --prod=false --ignore-scripts \
  && pnpm rebuild
 
-# Build
-RUN pnpm run typecheck:libs \
- && pnpm --filter @workspace/api-server run build \
- && PORT=8080 BASE_PATH=/ NODE_ENV=production pnpm --filter @workspace/swissgold run build
+# Build the storefront first, then the API server. No typechecks in prod builds.
+RUN PORT=8080 BASE_PATH=/ NODE_ENV=production pnpm --filter @workspace/swissgold run build \
+ && pnpm --filter @workspace/api-server run build
 
 ENV SERVE_STATIC_DIR=/app/artifacts/swissgold/dist/public
 ENV PORT=8080
