@@ -66,15 +66,15 @@ export default function Katalog() {
 
   return (
     <div>
-      <section className="relative border-b border-bg-3 overflow-hidden">
+      <section className="relative border-b border-bg-3 overflow-hidden min-h-[42vh] flex items-center">
         <img
           src={catalogHero}
           alt=""
           aria-hidden="true"
           className="absolute inset-0 w-full h-full object-cover object-center z-0"
         />
-        <div className="absolute inset-0 z-[1] bg-gradient-to-b from-bg-0/60 via-bg-0/80 to-bg-0" />
-        <div className="relative z-[2] container mx-auto px-4 py-16">
+        <div className="absolute inset-0 z-[1] bg-gradient-to-b from-bg-0/30 via-bg-0/30 to-bg-0" />
+        <div className="relative z-[2] container mx-auto px-4 py-16 w-full">
           <h1 className="text-4xl font-display mb-4">Katalog produktů</h1>
           <div className="flex gap-4 overflow-x-auto pb-4">
             {CATEGORY_TABS.map((tab) => {
