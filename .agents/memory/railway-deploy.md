@@ -26,3 +26,32 @@ token (visible only once on Railway → Settings → Tokens) was a valid UUID.
   uploads the repo and triggers a Dockerfile build, returning a build-logs URL
   without streaming (avoids the bash timeout on long builds).
 - CLI install: `npm install -g @railway/cli` (v5.x). Never echo the token value.
+
+## `railway up` snapshots the working tree AT UPLOAD TIME
+
+`railway up` uploads the current on-disk working tree, not a committed revision.
+If a file has unresolved merge-conflict markers or any broken state when you run
+it, the Docker build fails (esbuild: `Unexpected "<<"`). Always confirm a clean
+tree (`rg "<<<<<<<|>>>>>>>" src`) AND a passing local prod build
+(`PORT=8080 BASE_PATH=/ NODE_ENV=production pnpm --filter @workspace/swissgold run build`)
+before deploying.
+
+## Recurring/competing deploys come from Replit "Publish", not the repo host
+
+Railway here builds from UPLOAD snapshots (build log shows "uploading snapshot" +
+`COPY . .`), NOT a remote clone. Extra deploys appearing right after a manual
+`railway up` have `meta.reason=redeploy`, `meta.cliCaller=replit_agent` — they are
+the Replit Publish integration redeploying a STALE snapshot, so they FAIL and do
+NOT override a good `railway up` SUCCESS. To stop the noise, don't click Publish
+in Replit; deploy via `railway up`.
+
+## Diagnose deploy status without the dashboard (GraphQL)
+
+CLI `railway logs/service/variables` fail with a project token ("No service
+linked"). Instead POST https://backboard.railway.com/graphql/v2 with header
+`Project-Access-Token: <RAILWAY_TOKEN>` (Bearer = "Not Authorized").
+- list: `deployments(first:N,input:{serviceId,environmentId}){edges{node{id status createdAt meta}}}`
+- build error: `buildLogs(deploymentId:"<id>"){message}`
+A FAILED deployment is NOT promoted; the previous SUCCESS stays live.
+Verify live: `curl -o /dev/null -w "%{content_type}" https://swissgold.cz/assets/<asset>` —
+`image/png` = served, `text/html` = SPA fallback (asset not in that build).
