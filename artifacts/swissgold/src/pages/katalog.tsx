@@ -5,6 +5,7 @@ import {
   getGetPricesQueryKey,
 } from "@workspace/api-client-react";
 import { ProductCard } from "@/components/product-card";
+import catalogHero from "../assets/catalog-hero-mountains.png";
 
 interface CategoryTab {
   label: string;
@@ -64,37 +65,48 @@ export default function Katalog() {
   });
 
   return (
-    <div className="container mx-auto px-4 py-16">
-      <div className="mb-12">
-        <h1 className="text-4xl font-display mb-4">Katalog produktů</h1>
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {CATEGORY_TABS.map((tab) => {
-            const isActive = tab.slug === activeTab.slug;
-            return (
-              <button
-                key={tab.label}
-                onClick={() => setTab(tab)}
-                className={`px-4 py-2 text-sm uppercase tracking-widest border whitespace-nowrap ${
-                  isActive
-                    ? "border-gold text-gold"
-                    : "border-bg-3 text-ink-2"
-                } hover:border-gold hover:text-gold transition-colors`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
+    <div>
+      <section className="relative border-b border-bg-3 overflow-hidden">
+        <img
+          src={catalogHero}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover object-center z-0"
+        />
+        <div className="absolute inset-0 z-[1] bg-gradient-to-b from-bg-0/60 via-bg-0/80 to-bg-0" />
+        <div className="relative z-[2] container mx-auto px-4 py-16">
+          <h1 className="text-4xl font-display mb-4">Katalog produktů</h1>
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {CATEGORY_TABS.map((tab) => {
+              const isActive = tab.slug === activeTab.slug;
+              return (
+                <button
+                  key={tab.label}
+                  onClick={() => setTab(tab)}
+                  className={`px-4 py-2 text-sm uppercase tracking-widest border whitespace-nowrap ${
+                    isActive
+                      ? "border-gold text-gold"
+                      : "border-bg-3 text-ink-2"
+                  } hover:border-gold hover:text-gold transition-colors`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {products?.map((product) => (
-          <ProductCard
-            key={product.id}
-            product={product}
-            price={prices?.find((p) => p.id === product.id)}
-          />
-        ))}
+      <div className="container mx-auto px-4 py-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {products?.map((product) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              price={prices?.find((p) => p.id === product.id)}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
