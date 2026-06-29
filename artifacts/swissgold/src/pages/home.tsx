@@ -2,7 +2,7 @@ import { useListFeaturedProducts, useGetPrices, getGetPricesQueryKey, useGetCont
 import { ProductCard } from "@/components/product-card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import heroBg from "@/assets/hero-bg.png";
+import heroBg from "@assets/grok-image-9fd341e0-4851-4d4f-bdfe-7d70a0d5cbc9_1782713043597.jpg";
 
 export default function Home() {
   const { data: featured } = useListFeaturedProducts();

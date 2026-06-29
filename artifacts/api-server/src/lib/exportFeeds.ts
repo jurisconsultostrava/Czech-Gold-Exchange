@@ -4,8 +4,15 @@ import {
   productsTable,
   priceOverridesTable,
   type Product,
+  type PriceOverride,
+  type Settings,
 } from "@workspace/db";
-import { fetchPriceFeed, normalizeName, type FeedItem } from "./feeds";
+import {
+  fetchPriceFeed,
+  normalizeName,
+  type FeedItem,
+  type PriceFeed,
+} from "./feeds";
 import { computePrice, type ComputedPrice } from "./pricing";
 import { getSettings } from "./settings";
 
@@ -29,17 +36,49 @@ export interface FeedProduct {
 }
 
 /**
- * Load active products, match each to the live price feed (by code, then name),
- * and compute its published price. Products without a feed match are skipped so
- * the exported feed never advertises a product with no price.
+ * Raised when no active product can be matched to the live price feed. The feed
+ * routes turn this into a 502 so a price-comparison site is never served an
+ * empty <SHOP>/RSS document (which would silently delist every product).
  */
-export async function buildFeedProducts(): Promise<FeedProduct[]> {
-  const [feed, settings, products, overrides] = await Promise.all([
-    fetchPriceFeed(),
-    getSettings(),
+export class EmptyFeedError extends Error {
+  constructor(message = "No active products matched the live price feed") {
+    super(message);
+    this.name = "EmptyFeedError";
+  }
+}
+
+/**
+ * Data sources for {@link buildFeedProducts}. Defaults hit the live price feed,
+ * settings, and DB; tests inject stubs so the join/guard logic can be exercised
+ * without a network call or database.
+ */
+export interface FeedSources {
+  fetchPriceFeed: () => Promise<PriceFeed>;
+  getSettings: () => Promise<Settings>;
+  loadActiveProducts: () => Promise<Product[]>;
+  loadOverrides: () => Promise<PriceOverride[]>;
+}
+
+const defaultSources: FeedSources = {
+  fetchPriceFeed: () => fetchPriceFeed(),
+  getSettings: () => getSettings(),
+  loadActiveProducts: () =>
     db.select().from(productsTable).where(eq(productsTable.active, true)),
-    db.select().from(priceOverridesTable),
-  ]);
+  loadOverrides: () => db.select().from(priceOverridesTable),
+};
+
+/**
+ * Match each active product to the live price feed (by CODE first, then by
+ * normalized NAME) and compute its published price. Pure: no IO, no caching.
+ * Products without a feed match are dropped so the exported feed never
+ * advertises a product with no price.
+ */
+export function matchFeedProducts(
+  products: Product[],
+  feed: PriceFeed,
+  settings: Settings,
+  overrides: PriceOverride[],
+): FeedProduct[] {
   const overrideMap = new Map(overrides.map((o) => [o.productId, o]));
 
   return products
@@ -57,6 +96,28 @@ export async function buildFeedProducts(): Promise<FeedProduct[]> {
       return { product, price, feedItem };
     })
     .filter((p): p is FeedProduct => p !== null);
+}
+
+/**
+ * Load active products, match each to the live price feed, and compute its
+ * published price. Throws {@link EmptyFeedError} when zero products match so the
+ * feed routes surface an error instead of publishing an empty document.
+ */
+export async function buildFeedProducts(
+  sources: FeedSources = defaultSources,
+): Promise<FeedProduct[]> {
+  const [feed, settings, products, overrides] = await Promise.all([
+    sources.fetchPriceFeed(),
+    sources.getSettings(),
+    sources.loadActiveProducts(),
+    sources.loadOverrides(),
+  ]);
+
+  const matched = matchFeedProducts(products, feed, settings, overrides);
+  if (matched.length === 0) {
+    throw new EmptyFeedError();
+  }
+  return matched;
 }
 
 function metalFor(product: Product): string {
