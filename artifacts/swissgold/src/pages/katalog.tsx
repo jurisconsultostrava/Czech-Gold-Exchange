@@ -75,7 +75,15 @@ export default function Katalog() {
         />
         <div className="absolute inset-0 z-[1] bg-gradient-to-b from-bg-0/30 via-bg-0/30 to-bg-0" />
         <div className="relative z-[2] container mx-auto px-4 py-16 w-full">
-          <h1 className="text-4xl font-display mb-4">Katalog produktů</h1>
+          <h1 className="text-4xl md:text-5xl font-display mb-4 max-w-3xl">
+            ZLATO, KTERÉMU SVĚT VĚŘÍ 733 LET
+          </h1>
+          <p className="text-ink-2 max-w-2xl mb-8 leading-relaxed">
+            Od roku 1291 je švýcarské zlato synonymem pro důvěru, stabilitu a
+            zachování hodnoty. Přinášíme Vám tuto tradici přímo, s certifikací
+            LBMA Good Delivery, zárukou globální likvidity a transparentního
+            původu bez kompromisů.
+          </p>
           <div className="flex gap-4 overflow-x-auto pb-4">
             {CATEGORY_TABS.map((tab) => {
               const isActive = tab.slug === activeTab.slug;
