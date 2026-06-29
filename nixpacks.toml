@@ -1,0 +1,5 @@
+[phases.setup]
+nixPkgs = []
+
+[start]
+cmd = "sh scripts/railway-start.sh"

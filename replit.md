@@ -34,7 +34,7 @@ Single web service (the Express API server also serves the built storefront) + a
 
 - **Build**: Railway builds the `Dockerfile` (glibc `node:24-bookworm-slim` — NOT alpine, because the workspace prunes `*-musl` native binaries). It installs deps, builds libs + API bundle, then builds the storefront with `BASE_PATH=/`.
 - **Run**: `scripts/railway-start.sh` runs `drizzle-kit push` (schema sync), optionally seeds when `RUN_SEED=true`, then starts `node artifacts/api-server/dist/index.mjs`. The server reads `SERVE_STATIC_DIR` (set in the Dockerfile) to serve the frontend at `/` with SPA fallback; `/api/*` is the JSON API. Healthcheck: `/api/healthz`.
-- **Required env vars on Railway**: `DATABASE_URL` (from the Postgres plugin), `JWT_SECRET` (or `SESSION_SECRET`), `ADMIN_EMAIL`, `ADMIN_PASSWORD`. `PORT` is injected by Railway. Optional: `RUN_SEED=true` for first deploy, `RUN_MIGRATIONS=false` to skip the boot-time `drizzle-kit push` once the schema is stable, and feed overrides `PRODUCT_FEED_URL`/`PRICE_FEED_URL`/`SPOT_API_URL`.
+- **Required env vars on Railway**: `DATABASE_URL` (from the Postgres plugin), `JWT_SECRET` (or `SESSION_SECRET`), `ADMIN_EMAIL`, `ADMIN_PASSWORD`. `PORT` is injected by Railway. Optional: `RUN_SEED=true` for first deploy, `RUN_MIGRATIONS=false` to skip the boot-time `drizzle-kit push` once the schema is stable, `SHOP_URL` (public storefront origin, default `https://swissgold.cz`, used as the base for `<URL>`/`<g:link>` in the XML export feeds), and feed overrides `PRODUCT_FEED_URL`/`PRICE_FEED_URL`/`SPOT_API_URL`.
 - The single-origin setup means customer auth cookies work without CORS/SameSite changes; `trust proxy` is enabled in production so `Secure` cookies are honored behind Railway's TLS proxy.
 
 ## Architecture decisions
@@ -48,7 +48,7 @@ Single web service (the Express API server also serves the built storefront) + a
 
 ## Product
 
-Czech precious-metals e-commerce storefront: homepage, catalog (`/katalog`, category filter via URL `?category=`), product detail (`/detail/:id`), cart (`/kosik`, paylibo QR), buyback request + calculator (`/vykup`), about (`/o-nas`), and a JWT-protected admin area (`/admin`) with product/order/buyback management and XML/CSV import-export. Live spot-price ticker, CZK/EUR currency toggle, Czech UI throughout.
+Czech precious-metals e-commerce storefront: homepage, catalog (`/katalog`, category filter via URL `?category=`), product detail (`/detail/:id`), cart (`/kosik`, paylibo QR), buyback request + calculator (`/vykup`), about (`/o-nas`), and a JWT-protected admin area (`/admin`) with product/order/buyback management and XML/CSV import-export. Public price-comparison XML feeds (cached 1h): `/api/feed/heureka` and `/api/feed/zbozi` (identical Heureka SHOPITEM format) and `/api/feed/google` (Google Shopping RSS); all use the live mergado price + per-product overrides and are linkable/copyable from the admin Import/Export tab. Live spot-price ticker, CZK/EUR currency toggle, Czech UI throughout.
 
 ## User preferences
 

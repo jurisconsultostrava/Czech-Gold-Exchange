@@ -1,0 +1,160 @@
+Add Heureka.cz XML feed export
+Create a new API route GET /api/feed/heureka that generates a valid Heureka.cz XML product feed.
+Heureka XML format:
+xml<?xml version="1.0" encoding="utf-8"?>
+<SHOP>
+  <SHOPITEM>
+    <ITEM_ID>30070</ITEM_ID>
+    <PRODUCTNAME>Argor-Heraeus zlatý slitek 1 kg</PRODUCTNAME>
+    <PRODUCT>Argor-Heraeus zlatý slitek 1 kg</PRODUCT>
+    <DESCRIPTION>Investiční zlatý slitek 1 kg od švýcarské rafinérie Argor-Heraeus. LBMA Good Delivery certifikát. Osvobozeno od DPH.</DESCRIPTION>
+    <URL>https://swissgold.cz/detail?id=30070</URL>
+    <IMGURL>https://goldspot.cz/obrazky/30070/1.webp</IMGURL>
+    <PRICE_VAT>2885499</PRICE_VAT>
+    <VAT>0</VAT>
+    <MANUFACTURER>Argor-Heraeus</MANUFACTURER>
+    <CATEGORYTEXT>Investiční kovy | Zlato | Zlaté slitky</CATEGORYTEXT>
+    <EAN></EAN>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <PARAM>
+      <PARAM_NAME>Hmotnost</PARAM_NAME>
+      <VAL>1000 g</VAL>
+    </PARAM>
+    <PARAM>
+      <PARAM_NAME>Ryzost</PARAM_NAME>
+      <VAL>999.9</VAL>
+    </PARAM>
+    <PARAM>
+      <PARAM_NAME>Materiál</PARAM_NAME>
+      <VAL>Zlato</VAL>
+    </PARAM>
+  </SHOPITEM>
+</SHOP>
+Implementation in artifacts/api-server/src/routes/catalog.ts:
+typescriptrouter.get('/feed/heureka', async (req, res) => {
+  // Get all active products
+  const products = await db.select().from(productsTable)
+    .where(eq(productsTable.active, true))
+    .orderBy(productsTable.sortOrder);
+
+  // Get current prices from xaumanager feed
+  const prices = await fetchPriceFeed(); // returns Map<id, {priceCzk, purchasePriceCzk}>
+
+  // Build XML
+  const items = products.map(p => {
+    const price = prices.get(p.id);
+    const priceCzk = price?.priceCzk ?? 0;
+
+    // Category mapping
+    const categoryMap: Record<string, string> = {
+      'investicni-zlato': 'Investiční kovy | Zlato | ' + (p.subcat === 'mince' ? 'Zlaté mince' : 'Zlaté slitky'),
+      'investicni-stribro': 'Investiční kovy | Stříbro | ' + (p.subcat === 'mince' ? 'Stříbrné mince' : 'Stříbrné slitky'),
+      'platina-palladium': 'Investiční kovy | ' + (p.subcat === 'palladium' ? 'Palladium' : 'Platina'),
+      'mince-cnb': 'Investiční kovy | Mince ČNB',
+    };
+
+    // Metal mapping
+    const metalMap: Record<string, string> = {
+      'investicni-zlato': 'Zlato',
+      'investicni-stribro': 'Stříbro',
+      'platina-palladium': p.subcat === 'palladium' ? 'Palladium' : 'Platina',
+      'mince-cnb': 'Zlato',
+    };
+
+    // Weight formatting
+    const weightStr = p.weightGrams >= 1000
+      ? `${p.weightGrams / 1000} kg`
+      : p.weightGrams >= 31 && p.weightGrams <= 32
+      ? `${(p.weightGrams / 31.1).toFixed(0)} oz`
+      : `${p.weightGrams} g`;
+
+    // Availability
+    const deliveryDate = ['skladem-cz', 'skladem-de-ch'].includes(p.availability ?? '')
+      ? '0'
+      : ['na-ceste', 'predobjednavka'].includes(p.availability ?? '')
+      ? '7'
+      : '-1'; // nedostupne/vyprodano
+
+    const baseUrl = process.env.SHOP_URL ?? 'https://swissgold.cz';
+
+    return `  <SHOPITEM>
+    <ITEM_ID>${p.id}</ITEM_ID>
+    <PRODUCTNAME>${escapeXml(p.name)}</PRODUCTNAME>
+    <PRODUCT>${escapeXml(p.name)}</PRODUCT>
+    <DESCRIPTION>${escapeXml(p.description ?? `${p.name}. Investiční kov osvobozený od DPH.`)}</DESCRIPTION>
+    <URL>${baseUrl}/detail?id=${p.id}</URL>
+    <IMGURL>${escapeXml(p.image ?? '')}</IMGURL>
+    <PRICE_VAT>${Math.round(priceCzk)}</PRICE_VAT>
+    <VAT>0</VAT>
+    ${p.manufacturer ? `<MANUFACTURER>${escapeXml(p.manufacturer)}</MANUFACTURER>` : ''}
+    <CATEGORYTEXT>${categoryMap[p.category] ?? 'Investiční kovy'}</CATEGORYTEXT>
+    <DELIVERY_DATE>${deliveryDate}</DELIVERY_DATE>
+    <PARAM>
+      <PARAM_NAME>Hmotnost</PARAM_NAME>
+      <VAL>${weightStr}</VAL>
+    </PARAM>
+    <PARAM>
+      <PARAM_NAME>Ryzost</PARAM_NAME>
+      <VAL>${p.fineness}</VAL>
+    </PARAM>
+    <PARAM>
+      <PARAM_NAME>Materiál</PARAM_NAME>
+      <VAL>${metalMap[p.category] ?? 'Zlato'}</VAL>
+    </PARAM>
+    ${p.year ? `<PARAM><PARAM_NAME>Rok</PARAM_NAME><VAL>${p.year}</VAL></PARAM>` : ''}
+  </SHOPITEM>`;
+  }).join('\n');
+
+  const xml = `<?xml version="1.0" encoding="utf-8"?>\n<SHOP>\n${items}\n</SHOP>`;
+
+  res.set('Content-Type', 'application/xml; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=3600'); // cache 1 hodinu
+  res.send(xml);
+});
+
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+Also add to admin Import/Export tab:
+
+"Heureka XML feed" section with URL: {baseUrl}/api/feed/heureka
+Copy URL button
+"Otevřít feed" link button
+Note: "Aktualizuje se automaticky každou hodinu"
+
+Also add:
+
+GET /api/feed/zbozi — same format as Heureka (Zboží.cz uses identical Heureka XML format)
+GET /api/feed/google — Google Shopping feed:
+
+xml<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <title>SwissGold.cz</title>
+    <link>https://swissgold.cz</link>
+    <description>Investiční drahé kovy</description>
+    <item>
+      <g:id>30070</g:id>
+      <g:title>Argor-Heraeus zlatý slitek 1 kg</g:title>
+      <g:description>...</g:description>
+      <g:link>https://swissgold.cz/detail?id=30070</g:link>
+      <g:image_link>https://goldspot.cz/obrazky/30070/1.webp</g:image_link>
+      <g:price>2885499 CZK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:condition>new</g:condition>
+      <g:brand>Argor-Heraeus</g:brand>
+      <g:product_type>Investiční kovy &gt; Zlato &gt; Zlaté slitky</g:product_type>
+      <g:tax>
+        <g:country>CZ</g:country>
+        <g:rate>0</g:rate>
+        <g:tax_ship>no</g:tax_ship>
+      </g:tax>
+    </item>
+  </channel>
+</rss>
+Add SHOP_URL=https://swissgold.cz to Railway Variables after deploy.

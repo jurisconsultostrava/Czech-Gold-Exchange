@@ -41,6 +41,13 @@ onlyBuiltDependencies:
   - esbuild
   - msw
   - unrs-resolver
+  - '@tailwindcss/oxide'
+  - lightningcss
+  - rollup
+  - sharp
+  - better-sqlite3
+  - canvas
+  - node-gyp
 
 overrides:
   '@esbuild-kit/esm-loader': npm:tsx@^4.21.0
