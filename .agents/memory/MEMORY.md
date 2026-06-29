@@ -2,5 +2,6 @@
 - [SwissGold Railway deploy](swissgold-railway-deploy.md) — single combined service (Express serves API + Vite build); glibc image required (musl binaries pruned); SERVE_STATIC_DIR gates static serving so Replit is unaffected.
 - [SwissGold price feed](swissgold-price-feed.md) — live prices from mergado XML (final retail, whole CZK, no ÷100, no margin); matched by CODE then NAME; haléře trap if source changes.
 - [SwissGold dual auth model](swissgold-auth.md) — admin = bearer JWT (localStorage); customer = httpOnly cookie `sg_customer_token` (auto-sent same-origin, no mutator change); JWT secret is fail-fast, never hardcode a fallback.
+- [Railway deploy / token format](railway-deploy.md) — Railway tokens ARE 36-char UUIDs; verify with `railway status`, never judge validity by shape; deploy via `railway up --service … --detach`.
 - [SwissGold xaumanager feeds](swissgold-feeds.md) — TWO separate feeds: meistergold (product catalog → seed) + xml (live price/stock → /prices), joined by ITEM_ID===CODE. Don't merge.
 - [SwissGold feed alerts](swissgold-feed-alerts.md) — repeated feed 502s alert after N consecutive fails (log + optional webhook); in-process streak counter assumes single Railway instance.
