@@ -1,0 +1,47 @@
+Fix catalog category filter tabs
+The catalog page shows tabs VŠE / ZLATO / STŘÍBRO / PLATINA / PALLADIUM but filtering doesn't work correctly. Fix the category mapping:
+In artifacts/swissgold/src/pages/katalog.tsx, the category filter tabs must map to DB values:
+typescriptconst CATEGORY_TABS = [
+  { label: 'VŠE', value: '' },
+  { label: 'ZLATO', value: 'investicni-zlato' },
+  { label: 'STŘÍBRO', value: 'investicni-stribro' },
+  { label: 'PLATINA', value: 'platina-palladium' },
+  { label: 'PALLADIUM', value: 'platina-palladium' },
+];
+Wait — PLATINA and PALLADIUM both map to platina-palladium category but differ by subcat. Fix:
+typescriptconst CATEGORY_TABS = [
+  { label: 'VŠE', value: null, subcat: null },
+  { label: 'ZLATO', value: 'investicni-zlato', subcat: null },
+  { label: 'STŘÍBRO', value: 'investicni-stribro', subcat: null },
+  { label: 'PLATINA', value: 'platina-palladium', subcat: 'platina' },
+  { label: 'PALLADIUM', value: 'platina-palladium', subcat: 'palladium' },
+];
+When a tab is selected, pass both category and subcat as query params to /api/products:
+
+/api/products?category=investicni-zlato for ZLATO
+/api/products?category=platina-palladium&subcat=platina for PLATINA
+/api/products?category=platina-palladium&subcat=palladium for PALLADIUM
+
+Also fix the backend route in artifacts/api-server/src/routes/catalog.ts to filter by subcat when provided:
+typescriptrouter.get('/products', async (req, res) => {
+  const { category, subcat, page = '1', limit = '24' } = req.query;
+  
+  const conditions = [eq(products.active, true)];
+  if (category) conditions.push(eq(products.category, category as string));
+  if (subcat) conditions.push(eq(products.subcat, subcat as string));
+  
+  const items = await db.select()
+    .from(products)
+    .where(and(...conditions))
+    .orderBy(products.sortOrder, products.name)
+    .limit(Number(limit))
+    .offset((Number(page) - 1) * Number(limit));
+    
+  res.json(items);
+});
+Also update the URL params so the active tab persists on page refresh:
+
+?category=Zlato → maps to investicni-zlato
+?category=Stribro → maps to investicni-stribro
+
+Commit and push.

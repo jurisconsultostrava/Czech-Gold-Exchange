@@ -9,6 +9,11 @@ import {
 import { fetchPriceFeed, fetchSpot, normalizeName } from "../lib/feeds";
 import { computePrice } from "../lib/pricing";
 import { getSettings } from "../lib/settings";
+import {
+  buildFeedProducts,
+  buildHeurekaXml,
+  buildGoogleXml,
+} from "../lib/exportFeeds";
 
 const router: IRouter = Router();
 
@@ -92,6 +97,43 @@ router.get("/prices", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "Failed to compute prices");
     res.status(502).json({ error: "Ceny nejsou momentálně dostupné" });
+  }
+});
+
+router.get("/feed/heureka", async (req, res): Promise<void> => {
+  try {
+    const items = await buildFeedProducts();
+    res.set("Content-Type", "application/xml; charset=utf-8");
+    res.set("Cache-Control", "public, max-age=3600");
+    res.send(buildHeurekaXml(items));
+  } catch (err) {
+    req.log.error({ err }, "Failed to build Heureka feed");
+    res.status(502).json({ error: "Feed není momentálně dostupný" });
+  }
+});
+
+// Zboží.cz uses the identical Heureka SHOPITEM XML format.
+router.get("/feed/zbozi", async (req, res): Promise<void> => {
+  try {
+    const items = await buildFeedProducts();
+    res.set("Content-Type", "application/xml; charset=utf-8");
+    res.set("Cache-Control", "public, max-age=3600");
+    res.send(buildHeurekaXml(items));
+  } catch (err) {
+    req.log.error({ err }, "Failed to build Zboží feed");
+    res.status(502).json({ error: "Feed není momentálně dostupný" });
+  }
+});
+
+router.get("/feed/google", async (req, res): Promise<void> => {
+  try {
+    const items = await buildFeedProducts();
+    res.set("Content-Type", "application/xml; charset=utf-8");
+    res.set("Cache-Control", "public, max-age=3600");
+    res.send(buildGoogleXml(items));
+  } catch (err) {
+    req.log.error({ err }, "Failed to build Google feed");
+    res.status(502).json({ error: "Feed není momentálně dostupný" });
   }
 });
 

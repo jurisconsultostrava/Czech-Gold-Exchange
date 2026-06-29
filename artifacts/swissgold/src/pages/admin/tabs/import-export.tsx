@@ -34,10 +34,33 @@ async function uploadFile(path: string, file: File): Promise<{ imported: number 
   return res.json();
 }
 
+const FEEDS = [
+  { label: "Heureka.cz", path: "api/feed/heureka" },
+  { label: "Zboží.cz", path: "api/feed/zbozi" },
+  { label: "Google Shopping", path: "api/feed/google" },
+] as const;
+
+function feedUrl(path: string): string {
+  return `${window.location.origin}${import.meta.env.BASE_URL}${path}`;
+}
+
 export default function AdminImportExport() {
   const { toast } = useToast();
   const [result, setResult] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const handleCopy = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Zkopírováno", description: url });
+    } catch {
+      toast({
+        title: "Chyba",
+        description: "URL se nepodařilo zkopírovat.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleExport = async (type: "xml" | "csv") => {
     try {
@@ -133,6 +156,51 @@ export default function AdminImportExport() {
           </div>
           {busy && <p className="text-sm text-ink-3">Importuji...</p>}
           {result && <p className="text-sm text-gold">{result}</p>}
+        </div>
+      </div>
+
+      <div className="border border-bg-3 bg-bg-2 p-6 space-y-4 mt-8">
+        <h3 className="text-xl font-display text-ink-1">
+          XML feedy pro porovnávače
+        </h3>
+        <p className="text-sm text-ink-2">
+          Veřejné adresy produktových feedů. Aktualizuje se automaticky každou
+          hodinu.
+        </p>
+        <div className="space-y-4">
+          {FEEDS.map((feed) => {
+            const url = feedUrl(feed.path);
+            return (
+              <div key={feed.path} className="space-y-2">
+                <Label>{feed.label}</Label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={url}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="flex-1 bg-bg-1 border border-bg-3 px-3 py-2 text-sm text-ink-2 font-mono"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      className="bg-gold text-bg-0 hover:bg-gold-2 rounded-none"
+                      onClick={() => handleCopy(url)}
+                    >
+                      Kopírovat URL
+                    </Button>
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center border border-gold text-gold hover:bg-gold/10 px-4 py-2 text-sm font-medium"
+                    >
+                      Otevřít feed
+                    </a>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
