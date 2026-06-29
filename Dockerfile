@@ -10,8 +10,9 @@ RUN corepack enable
 
 COPY . .
 
-# Instalace s povolenými build skripty
-RUN pnpm install --frozen-lockfile --prod=false --config.unsafe-perm=true
+# Schval build skripty a nainstaluj
+RUN pnpm install --frozen-lockfile --prod=false --ignore-scripts \
+ && pnpm rebuild
 
 # Build
 RUN pnpm run typecheck:libs \
