@@ -2,6 +2,7 @@ import { useListFeaturedProducts, useGetPrices, getGetPricesQueryKey, useGetCont
 import { ProductCard } from "@/components/product-card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
+
 const heroBg = "https://goldspot.cz/grok-image-9fd341e0-4851-4d4f-bdfe-7d70a0d5cbc9.jpg";
 
 export default function Home() {
@@ -13,14 +14,12 @@ export default function Home() {
 
   return (
     <div className="w-full">
-      {/* Hero Section */}
-      <section className="relative min-h-[60vh] flex items-center border-b border-bg-3 overflow-hidden">
-        <section
-  className="relative min-h-[60vh] flex items-center border-b border-bg-3 overflow-hidden"
-  style={{ backgroundImage: `url(${heroBg})`, backgroundSize: "cover", backgroundPosition: "right center" }}
->
+      <section
+        className="relative min-h-[60vh] flex items-center border-b border-bg-3 overflow-hidden"
+        style={{ backgroundImage: `url(${heroBg})`, backgroundSize: "cover", backgroundPosition: "right center" }}
+      >
         <div className="absolute inset-0 z-[1] bg-gradient-to-r from-bg-0 via-bg-0/90 to-bg-0/30" />
-        <div className="container mx-auto px-4 z-10">
+        <div className="container mx-auto px-4 z-10 relative">
           <div className="max-w-2xl">
             <p className="eyebrow mb-4">Specialisté na investování do zlata</p>
             <h1 className="mb-6 font-display text-ink-1">
@@ -46,7 +45,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Featured Products */}
       <section className="py-24 bg-bg-1">
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-end mb-12">
@@ -58,7 +56,6 @@ export default function Home() {
               Celá nabídka &rarr;
             </Link>
           </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {featured?.map((product) => (
               <ProductCard
