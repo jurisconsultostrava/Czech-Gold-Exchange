@@ -1,8 +1,2 @@
-node_modules
-.git
-.replit
-.local
 attached_assets
-artifacts/swissgold/node_modules
-artifacts/api-server/node_modules
-lib/*/node_modules
+artifacts/mockup-sandbox
