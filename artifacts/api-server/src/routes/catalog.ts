@@ -101,7 +101,7 @@ router.get("/prices", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/feed/heureka", async (req, res): Promise<void> => {
+router.get(["/feed/heureka", "/feed/heureka.xml"], async (req, res): Promise<void> => {
   try {
     const items = await buildFeedProducts();
     feedAlerts.recordSuccess("heureka");
@@ -116,7 +116,7 @@ router.get("/feed/heureka", async (req, res): Promise<void> => {
 });
 
 // Zboží.cz uses the identical Heureka SHOPITEM XML format.
-router.get("/feed/zbozi", async (req, res): Promise<void> => {
+router.get(["/feed/zbozi", "/feed/zbozi.xml"], async (req, res): Promise<void> => {
   try {
     const items = await buildFeedProducts();
     feedAlerts.recordSuccess("zbozi");
@@ -130,7 +130,7 @@ router.get("/feed/zbozi", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/feed/google", async (req, res): Promise<void> => {
+router.get(["/feed/google", "/feed/google.xml"], async (req, res): Promise<void> => {
   try {
     const items = await buildFeedProducts();
     feedAlerts.recordSuccess("google");
