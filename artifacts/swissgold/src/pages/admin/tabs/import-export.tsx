@@ -35,9 +35,9 @@ async function uploadFile(path: string, file: File): Promise<{ imported: number 
 }
 
 const FEEDS = [
-  { label: "Heureka.cz", path: "api/feed/heureka" },
-  { label: "Zboží.cz", path: "api/feed/zbozi" },
-  { label: "Google Shopping", path: "api/feed/google" },
+  { label: "Heureka.cz", path: "api/feed/heureka.xml" },
+  { label: "Zboží.cz", path: "api/feed/zbozi.xml" },
+  { label: "Google Shopping", path: "api/feed/google.xml" },
 ] as const;
 
 function feedUrl(path: string): string {

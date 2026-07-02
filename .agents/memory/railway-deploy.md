@@ -55,3 +55,31 @@ linked"). Instead POST https://backboard.railway.com/graphql/v2 with header
 A FAILED deployment is NOT promoted; the previous SUCCESS stays live.
 Verify live: `curl -o /dev/null -w "%{content_type}" https://swissgold.cz/assets/<asset>` —
 `image/png` = served, `text/html` = SPA fallback (asset not in that build).
+
+## `RUN_SEED=true` makes deploys depend on the external product feed
+
+If a Railway deploy builds fine but dies at **Healthcheck** ("service unavailable",
+retries, "Healthcheck failed!"), read the *runtime* logs (`deploymentLogs`), not
+build logs. Cause seen: `RUN_SEED=true` re-runs the seed on EVERY boot; the seed
+fetches the xaumanager product feed, and when that external feed is down
+(`Product feed responded 503`) the seed exits non-zero → container never starts →
+healthcheck fails → deploy FAILED. Fix: set `RUN_SEED=false` (DB is already
+seeded; `true` is first-deploy only). Steady state here: `RUN_SEED=false`,
+`RUN_MIGRATIONS=false`.
+
+**Why:** deploys must not depend on a flaky third-party feed being up at boot.
+
+## Feed 502 (`EmptyFeedError`) usually = external price feed down, not a bug
+
+`/api/feed/{heureka,zbozi,google}[.xml]` return **502** ("Feed není momentálně
+dostupný") when zero products match the live price feed. Diagnose: `/api/products`
+(DB, should be 217) vs `/api/prices` — if `/api/prices` is 502 ("Ceny nejsou
+momentálně dostupné"), the external mergado price feed is down and ALL feeds 502
+until it recovers. Both plain and `.xml` routes 502 identically = routing is fine,
+it's the external source. `/api/spot` stays 200 (has GoldAPI fallback).
+
+## Set Railway env vars via GraphQL (no CLI link needed)
+
+Mutation with `Project-Access-Token`: `variableUpsert(input:{projectId,
+environmentId, serviceId, name, value})` → returns `true`. Then `railway up` to
+redeploy with the new value.
