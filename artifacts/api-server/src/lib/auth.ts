@@ -36,14 +36,20 @@ export async function checkCredentials(
   password: string,
 ): Promise<boolean> {
   const normalizedEmail = email.trim().toLowerCase();
-  const rows = await db
-    .select()
-    .from(administratorsTable)
-    .where(eq(administratorsTable.email, normalizedEmail))
-    .limit(1);
-  const admin = rows[0];
-  if (admin) {
-    return verifyPassword(password, admin.passwordHash);
+
+  try {
+    const rows = await db
+      .select()
+      .from(administratorsTable)
+      .where(eq(administratorsTable.email, normalizedEmail))
+      .limit(1);
+    const admin = rows[0];
+    if (admin) {
+      return verifyPassword(password, admin.passwordHash);
+    }
+  } catch (error) {
+    console.error("Admin DB query failed", error);
+    // Fall through to the env var fallback below.
   }
 
   // Fallback to environment variables for backward compatibility while
