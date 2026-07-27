@@ -15,5 +15,8 @@ if [ "$RUN_SEED" = "true" ]; then
   pnpm --filter @workspace/api-server run seed
 fi
 
+echo "[railway-start] Seeding default administrator..."
+pnpm --filter @workspace/api-server run seed:admin
+
 echo "[railway-start] Starting API server..."
 exec node --enable-source-maps artifacts/api-server/dist/index.mjs
