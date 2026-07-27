@@ -60,6 +60,11 @@ function Router() {
           <AdminDashboard />
         </RequireAdmin>
       </Route>
+      <Route path="/admin">
+        <RequireAdmin>
+          <AdminDashboard />
+        </RequireAdmin>
+      </Route>
       <Route>
         <PublicRouter />
       </Route>
