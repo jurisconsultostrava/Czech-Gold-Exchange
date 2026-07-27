@@ -46,15 +46,16 @@ app.use("/api", router);
 // this stays unset and the block is skipped.
 const staticDir = process.env.SERVE_STATIC_DIR;
 if (staticDir) {
-  const indexHtml = path.join(staticDir, "index.html");
-  app.use(express.static(staticDir, { index: false }));
+  const absoluteStaticDir = path.resolve(process.cwd(), staticDir);
+  const indexHtml = path.join(absoluteStaticDir, "index.html");
+  app.use(express.static(absoluteStaticDir, { index: false }));
   // SPA fallback: any non-API GET route returns index.html so client-side
   // routing (wouter) can take over.
   app.get(/.*/, (req, res, next) => {
     if (req.path.startsWith("/api")) return next();
     res.sendFile(indexHtml);
   });
-  logger.info({ staticDir }, "Serving static frontend");
+  logger.info({ staticDir, absoluteStaticDir }, "Serving static frontend");
 }
 
 export default app;
