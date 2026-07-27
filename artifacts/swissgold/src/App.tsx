@@ -29,25 +29,30 @@ function RequireAdmin({ children }: { children: React.ReactNode }) {
   if (!isAdminAuthenticated()) {
     return <Redirect to="/admin/login" />;
   }
+
   return <>{children}</>;
 }
 
 function PublicRouter() {
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Home} />
-        <Route path="/katalog" component={Katalog} />
-        <Route path="/detail/:id" component={Detail} />
-        <Route path="/kosik" component={Kosik} />
-        <Route path="/vykup" component={Vykup} />
-        <Route path="/o-nas" component={ONas} />
-        <Route path="/prihlaseni" component={Prihlaseni} />
-        <Route path="/registrace" component={Registrace} />
-        <Route path="/ucet" component={Ucet} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <CustomerAuthProvider>
+      <CartProvider>
+        <Layout>
+          <Switch>
+            <Route path="/" component={Home} />
+            <Route path="/katalog" component={Katalog} />
+            <Route path="/detail/:id" component={Detail} />
+            <Route path="/kosik" component={Kosik} />
+            <Route path="/vykup" component={Vykup} />
+            <Route path="/o-nas" component={ONas} />
+            <Route path="/prihlaseni" component={Prihlaseni} />
+            <Route path="/registrace" component={Registrace} />
+            <Route path="/ucet" component={Ucet} />
+            <Route component={NotFound} />
+          </Switch>
+        </Layout>
+      </CartProvider>
+    </CustomerAuthProvider>
   );
 }
 
@@ -55,11 +60,21 @@ function Router() {
   return (
     <Switch>
       <Route path="/admin/login" component={AdminLogin} />
+
+      <Route path="/admin">
+        {isAdminAuthenticated() ? (
+          <Redirect to="/admin/dashboard" />
+        ) : (
+          <Redirect to="/admin/login" />
+        )}
+      </Route>
+
       <Route path="/admin/:rest*">
         <RequireAdmin>
           <AdminDashboard />
         </RequireAdmin>
       </Route>
+
       <Route>
         <PublicRouter />
       </Route>
@@ -72,14 +87,11 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <CurrencyProvider>
-          <CustomerAuthProvider>
-            <CartProvider>
-              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                <Router />
-              </WouterRouter>
-            </CartProvider>
-          </CustomerAuthProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
         </CurrencyProvider>
+
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
