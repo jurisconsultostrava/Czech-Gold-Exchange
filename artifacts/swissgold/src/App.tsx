@@ -23,7 +23,13 @@ import AdminDashboard from "@/pages/admin/dashboard";
 
 initAdminAuth();
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+  },
+});
 
 function RequireAdmin({ children }: { children: React.ReactNode }) {
   if (!isAdminAuthenticated()) {
@@ -56,17 +62,23 @@ function PublicRouter() {
   );
 }
 
+function AdminRootRedirect() {
+  if (isAdminAuthenticated()) {
+    return <Redirect to="/admin/dashboard" />;
+  }
+
+  return <Redirect to="/admin/login" />;
+}
+
 function Router() {
   return (
     <Switch>
       <Route path="/admin/login" component={AdminLogin} />
 
-      <Route path="/admin">
-        {isAdminAuthenticated() ? (
-          <Redirect to="/admin/dashboard" />
-        ) : (
-          <Redirect to="/admin/login" />
-        )}
+      <Route path="/admin/dashboard">
+        <RequireAdmin>
+          <AdminDashboard />
+        </RequireAdmin>
       </Route>
 
       <Route path="/admin/:rest*">
@@ -74,6 +86,8 @@ function Router() {
           <AdminDashboard />
         </RequireAdmin>
       </Route>
+
+      <Route path="/admin" component={AdminRootRedirect} />
 
       <Route>
         <PublicRouter />
@@ -83,11 +97,13 @@ function Router() {
 }
 
 function App() {
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <CurrencyProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <WouterRouter base={basePath}>
             <Router />
           </WouterRouter>
         </CurrencyProvider>
