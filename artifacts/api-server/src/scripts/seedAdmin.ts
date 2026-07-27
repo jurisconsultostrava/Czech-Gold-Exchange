@@ -4,6 +4,9 @@ import { hashPassword } from "../lib/customerAuth";
 const DEFAULT_ADMIN_EMAIL = "admin@swissgold.cz";
 const DEFAULT_ADMIN_PASSWORD = "SwissGold2024!";
 
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? DEFAULT_ADMIN_EMAIL;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? DEFAULT_ADMIN_PASSWORD;
+
 async function seedAdmin(): Promise<void> {
   const existing = await db.select().from(administratorsTable).limit(1);
   if (existing.length > 0) {
@@ -11,16 +14,16 @@ async function seedAdmin(): Promise<void> {
     return;
   }
 
-  const passwordHash = await hashPassword(DEFAULT_ADMIN_PASSWORD);
+  const passwordHash = await hashPassword(ADMIN_PASSWORD);
   await db
     .insert(administratorsTable)
     .values({
-      email: DEFAULT_ADMIN_EMAIL,
+      email: ADMIN_EMAIL,
       passwordHash,
     })
     .onConflictDoNothing();
 
-  console.log(`Default administrator created: ${DEFAULT_ADMIN_EMAIL}`);
+  console.log(`Administrator seeded: ${ADMIN_EMAIL}`);
   console.log(
     "Please change the default password after first login for security.",
   );
