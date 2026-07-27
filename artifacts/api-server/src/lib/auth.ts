@@ -1,4 +1,7 @@
 import jwt from "jsonwebtoken";
+import { eq } from "drizzle-orm";
+import { db, administratorsTable } from "@workspace/db";
+import { verifyPassword } from "./customerAuth";
 import { JWT_SECRET } from "./jwtSecret";
 
 export interface AdminTokenPayload {
@@ -28,9 +31,17 @@ export function verifyAdminToken(token: string): AdminTokenPayload | null {
   }
 }
 
-export function checkCredentials(email: string, password: string): boolean {
-  const adminEmail = process.env.ADMIN_EMAIL;
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  if (!adminEmail || !adminPassword) return false;
-  return email === adminEmail && password === adminPassword;
+export async function checkCredentials(
+  email: string,
+  password: string,
+): Promise<boolean> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const rows = await db
+    .select()
+    .from(administratorsTable)
+    .where(eq(administratorsTable.email, normalizedEmail))
+    .limit(1);
+  const admin = rows[0];
+  if (!admin) return false;
+  return verifyPassword(password, admin.passwordHash);
 }
