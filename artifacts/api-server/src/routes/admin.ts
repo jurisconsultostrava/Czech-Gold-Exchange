@@ -41,6 +41,10 @@ router.post("/login", async (req, res): Promise<void> => {
   res.json({ token: signAdminToken(email) });
 });
 
+router.get("/me", requireAdmin, async (req, res): Promise<void> => {
+  res.json({ authenticated: true, email: req.admin?.email });
+});
+
 router.use(requireAdmin);
 
 router.get("/stats", async (req, res): Promise<void> => {

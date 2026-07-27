@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { clearAdminToken } from "@/lib/admin-auth";
+import { clearAdminToken, getAdminToken } from "@/lib/admin-auth";
 import { Button } from "@/components/ui/button";
 import AdminOverview from "./tabs/overview";
 import AdminProducts from "./tabs/products";
@@ -40,6 +40,27 @@ export default function AdminDashboard() {
     clearAdminToken();
     navigate("/admin/login");
   };
+
+  useEffect(() => {
+    const token = getAdminToken();
+    if (!token) {
+      navigate("/admin/login");
+      return;
+    }
+    fetch("/api/admin/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (!res.ok) {
+          clearAdminToken();
+          navigate("/admin/login");
+        }
+      })
+      .catch(() => {
+        clearAdminToken();
+        navigate("/admin/login");
+      });
+  }, [navigate]);
 
   return (
     <div className="min-h-screen flex bg-bg-1 text-ink-1">
