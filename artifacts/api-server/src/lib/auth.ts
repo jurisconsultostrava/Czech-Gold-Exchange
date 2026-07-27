@@ -42,6 +42,22 @@ export async function checkCredentials(
     .where(eq(administratorsTable.email, normalizedEmail))
     .limit(1);
   const admin = rows[0];
-  if (!admin) return false;
-  return verifyPassword(password, admin.passwordHash);
+  if (admin) {
+    return verifyPassword(password, admin.passwordHash);
+  }
+
+  // Fallback to environment variables for backward compatibility while
+  // migrating admin credentials to the `administrators` database table.
+  const fallbackEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const fallbackPassword = process.env.ADMIN_PASSWORD;
+  if (
+    fallbackEmail &&
+    fallbackPassword &&
+    normalizedEmail === fallbackEmail &&
+    password === fallbackPassword
+  ) {
+    return true;
+  }
+
+  return false;
 }
