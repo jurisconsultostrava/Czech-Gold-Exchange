@@ -34,7 +34,7 @@ router.post("/login", async (req, res): Promise<void> => {
     return;
   }
   const { email, password } = parsed.data;
-  if (!(await checkCredentials(email, password))) {
+  if (!checkCredentials(email, password)) {
     res.status(401).json({ error: "Nesprávné přihlašovací údaje" });
     return;
   }
